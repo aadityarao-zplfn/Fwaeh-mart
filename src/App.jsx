@@ -8,6 +8,7 @@ import Products from './pages/Products';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Dashboard from './pages/Dashboard';
+import CustomerDashboardLayout from './components/dashboards/CustomerDashboardLayout';
 
 function App() {
   return (
@@ -15,15 +16,20 @@ function App() {
       <BrowserRouter>
         <Navbar />
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Products />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/products" element={<Products />} />
+
+          {/* Protected Customer Routes - Wrapped in CustomerDashboardLayout */}
           <Route
             path="/cart"
             element={
               <ProtectedRoute allowedRoles={['customer']}>
-                <Cart />
+                <CustomerDashboardLayout>
+                  <Cart />
+                </CustomerDashboardLayout>
               </ProtectedRoute>
             }
           />
@@ -31,10 +37,14 @@ function App() {
             path="/checkout"
             element={
               <ProtectedRoute allowedRoles={['customer']}>
-                <Checkout />
+                <CustomerDashboardLayout>
+                  <Checkout />
+                </CustomerDashboardLayout>
               </ProtectedRoute>
             }
           />
+
+          {/* Dashboard - Role-based rendering inside */}
           <Route
             path="/dashboard"
             element={
@@ -48,4 +58,5 @@ function App() {
     </AuthProvider>
   );
 }
+
 export default App;
