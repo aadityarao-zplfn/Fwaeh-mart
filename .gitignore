@@ -1,2 +1,30 @@
-https://stackblitz.com/storage/blobs/eyJfcmFpbHMiOnsiZGF0YSI6NDczMzQ5ODAsInB1ciI6ImJsb2JfaWQifX0=--e18551acc1a41a7d8cebe6acf00fd1822e58961b//.gitignore
+# Dependencies
+node_modules/
+
+# Environment variables
 .env
+.env.local
+.env.production
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Vite cache
+.vite/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Package lock (optional, team can decide)
+# package-lock.json
