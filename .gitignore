@@ -28,3 +28,5 @@ npm-debug.log*
 
 # Package lock (optional, team can decide)
 # package-lock.json
+node_modules/
+node_modules/
