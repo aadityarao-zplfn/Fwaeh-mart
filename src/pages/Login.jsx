@@ -1,31 +1,58 @@
-import { useState } from "react"
-import { Link } from "react-router-dom"
+import { useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [rememberMe, setRememberMe] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
-  }
+    e.preventDefault();
+    setError("");
+    setSuccess(false);
+
+    if (!email.trim() || !password) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setIsLoading(false);
+      setSuccess(true);
+      setError("");
+      alert("Login successful!");
+    } catch (err) {
+      setIsLoading(false);
+      setError(err.message || 'Login failed');
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{
       background: 'linear-gradient(135deg, #ffd4d4 0%, #ffb8be 50%, #ff9aa2 100%)'
     }}>
       <div className="w-full max-w-md">
-        {/* Card Container */}
         <div className="rounded-2xl shadow-2xl p-8" style={{
           background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)',
           border: '1px solid rgba(255, 130, 130, 0.3)'
         }}>
-          {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 shadow-lg" style={{
               background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)'
@@ -40,14 +67,24 @@ export default function LoginForm() {
             </p>
           </div>
 
-          {/* Login Form */}
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-100 border border-red-400 text-red-700">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 rounded-lg bg-green-100 border border-green-400 text-green-700">
+              Login successful!
+            </div>
+          )}
+
           <div className="space-y-5">
-            {/* Email Field */}
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-semibold" style={{ color: '#b91c1c' }}>
                 Email Address
               </label>
-              <div className="relative">
+              <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#f87171' }}>
                   <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <rect width="20" height="16" x="2" y="4" rx="2"/>
@@ -60,7 +97,7 @@ export default function LoginForm() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border-2 transition-all outline-none"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ease-in-out group-hover:scale-[1.03] group-hover:shadow-md"
                   style={{
                     background: '#fff5f5',
                     borderColor: '#fca5a5',
@@ -73,7 +110,6 @@ export default function LoginForm() {
               </div>
             </div>
 
-            {/* Password Field */}
             <div className="space-y-2">
               <label htmlFor="password" className="block text-sm font-semibold" style={{ color: '#b91c1c' }}>
                 Password
@@ -122,7 +158,6 @@ export default function LoginForm() {
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <input
@@ -142,7 +177,6 @@ export default function LoginForm() {
               </a>
             </div>
 
-            {/* Login Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -153,11 +187,20 @@ export default function LoginForm() {
                 color: '#ffffff'
               }}
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? (
+                <span className="flex justify-center items-center gap-2">
+                  <span
+                    className="w-5 h-5 border-2 border-t-2 border-t-[#ff5757] border-[#ffe8e8] rounded-full animate-spin"
+                    style={{ display: "inline-block" }}
+                  ></span>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </button>
           </div>
 
-          {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t" style={{ borderColor: '#fca5a5' }}></div>
@@ -172,7 +215,6 @@ export default function LoginForm() {
             </div>
           </div>
 
-          {/* Social Login */}
           <button
             type="button"
             className="w-full py-3 rounded-xl font-semibold transition-all border-2 shadow-sm hover:shadow-md"
@@ -205,7 +247,6 @@ export default function LoginForm() {
             </div>
           </button>
 
-          {/* Sign Up Link - FIXED */}
           <p className="text-center mt-6" style={{ color: '#dc2626' }}>
             Don't have an account?{" "}
             <Link to="/register" className="font-bold transition-colors hover:opacity-80" style={{ color: '#ff5757' }}>
@@ -215,5 +256,5 @@ export default function LoginForm() {
         </div>
       </div>
     </div>
-  )
+  );
 }
