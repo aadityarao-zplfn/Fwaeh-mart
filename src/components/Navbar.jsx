@@ -1,73 +1,78 @@
-{
-  "name": "my-v0-project",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint ."
-  },
-  "dependencies": {
-    "@hookform/resolvers": "^3.10.0",
-    "@radix-ui/react-accordion": "1.2.2",
-    "@radix-ui/react-alert-dialog": "1.1.4",
-    "@radix-ui/react-aspect-ratio": "1.1.1",
-    "@radix-ui/react-avatar": "1.1.2",
-    "@radix-ui/react-checkbox": "1.1.3",
-    "@radix-ui/react-collapsible": "1.1.2",
-    "@radix-ui/react-context-menu": "2.2.4",
-    "@radix-ui/react-dialog": "1.1.4",
-    "@radix-ui/react-dropdown-menu": "2.1.4",
-    "@radix-ui/react-hover-card": "1.1.4",
-    "@radix-ui/react-label": "2.1.1",
-    "@radix-ui/react-menubar": "1.1.4",
-    "@radix-ui/react-navigation-menu": "1.2.3",
-    "@radix-ui/react-popover": "1.1.4",
-    "@radix-ui/react-progress": "1.1.1",
-    "@radix-ui/react-radio-group": "1.2.2",
-    "@radix-ui/react-scroll-area": "1.2.2",
-    "@radix-ui/react-select": "2.1.4",
-    "@radix-ui/react-separator": "1.1.1",
-    "@radix-ui/react-slider": "1.2.2",
-    "@radix-ui/react-slot": "1.1.1",
-    "@radix-ui/react-switch": "1.1.2",
-    "@radix-ui/react-tabs": "1.1.2",
-    "@radix-ui/react-toast": "1.2.4",
-    "@radix-ui/react-toggle": "1.1.1",
-    "@radix-ui/react-toggle-group": "1.1.1",
-    "@radix-ui/react-tooltip": "1.1.6",
-    "@vercel/analytics": "1.3.1",
-    "autoprefixer": "^10.4.20",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "1.0.4",
-    "date-fns": "4.1.0",
-    "embla-carousel-react": "8.5.1",
-    "input-otp": "1.4.1",
-    "lucide-react": "^0.454.0",
-    "next": "16.0.0",
-    "next-themes": "^0.4.6",
-    "react": "19.2.0",
-    "react-day-picker": "9.8.0",
-    "react-dom": "19.2.0",
-    "react-hook-form": "^7.60.0",
-    "react-resizable-panels": "^2.1.7",
-    "recharts": "2.15.4",
-    "sonner": "^1.7.4",
-    "tailwind-merge": "^3.3.1",
-    "tailwindcss-animate": "^1.0.7",
-    "vaul": "^0.9.9",
-    "zod": "3.25.76"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.9",
-    "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "postcss": "^8.5",
-    "tailwindcss": "^4.1.9",
-    "tw-animate-css": "1.3.3",
-    "typescript": "^5"
-  }
-}
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { ShoppingCart, LogOut, LayoutDashboard } from 'lucide-react';
+
+const Navbar = () => {
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  return (
+    <nav className="bg-white shadow-md sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <Link to="/" className="text-2xl font-bold text-blue-600">
+            Fwaeh Mart
+          </Link>
+
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link to="/products" className="text-gray-700 hover:text-blue-600 transition">
+              Products
+            </Link>
+            {user && profile?.role === 'customer' && (
+              <Link to="/cart" className="text-gray-700 hover:text-blue-600 transition flex items-center">
+                <ShoppingCart size={20} className="mr-1" />
+                Cart
+              </Link>
+            )}
+          </div>
+
+          {/* User Actions */}
+          <div className="flex items-center space-x-4">
+            {user ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center text-gray-700 hover:text-blue-600 transition"
+                >
+                  <LayoutDashboard size={20} className="mr-1" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center text-gray-700 hover:text-red-600 transition"
+                >
+                  <LogOut size={20} className="mr-1" />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+                <div className="text-sm text-gray-600 hidden lg:block">
+                  {profile?.full_name}
+                </div>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="text-gray-700 hover:text-blue-600 transition">
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+export default Navbar;
