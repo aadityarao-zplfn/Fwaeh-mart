@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // ADD useNavigate
+import { supabase } from "../lib/supabase"; // ADD THIS IMPORT
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -9,12 +10,16 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  
+  const navigate = useNavigate(); // ADD THIS
 
+  // REPLACE the handleSubmit function with this:
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess(false);
 
+    // Validation (keep her existing validation)
     if (!email.trim() || !password) {
       setError("Please fill in all fields");
       return;
@@ -31,16 +36,57 @@ export default function LoginForm() {
       return;
     }
 
+    // SUPABASE INTEGRATION STARTS HERE
     setIsLoading(true);
+    
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setIsLoading(false);
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (signInError) {
+        setError(signInError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      // Success!
       setSuccess(true);
-      setError("");
-      alert("Login successful!");
+      setIsLoading(false);
+      
+      // Navigate to dashboard after successful login
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
+
     } catch (err) {
       setIsLoading(false);
-      setError(err.message || 'Login failed');
+      setError(err.message || 'Login failed. Please try again.');
+    }
+  };
+
+  // ADD THIS NEW FUNCTION for Google OAuth
+  const handleGoogleLogin = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          // If you want to persist session
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        }
+      });
+
+      if (error) {
+        setError(error.message);
+      }
+      // Supabase will redirect automatically on success
+    } catch (err) {
+      setError('Google sign-in failed. Please try again.');
     }
   };
 
@@ -75,11 +121,11 @@ export default function LoginForm() {
 
           {success && (
             <div className="mb-4 p-3 rounded-lg bg-green-100 border border-green-400 text-green-700">
-              Login successful!
+              Login successful! Redirecting...
             </div>
           )}
 
-          <div className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5"> {/* WRAP IN FORM TAG */}
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-semibold" style={{ color: '#b91c1c' }}>
                 Email Address
@@ -180,7 +226,6 @@ export default function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              onClick={handleSubmit}
               className="w-full py-3.5 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)',
@@ -199,7 +244,7 @@ export default function LoginForm() {
                 "Sign In"
               )}
             </button>
-          </div>
+          </form> {/* CLOSE FORM TAG */}
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
@@ -215,8 +260,10 @@ export default function LoginForm() {
             </div>
           </div>
 
+          {/* ADD onClick to Google button */}
           <button
             type="button"
+            onClick={handleGoogleLogin} // ADD THIS
             className="w-full py-3 rounded-xl font-semibold transition-all border-2 shadow-sm hover:shadow-md"
             style={{
               background: '#fff5f5',
