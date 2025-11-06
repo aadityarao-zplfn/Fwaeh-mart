@@ -1,13 +1,64 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ShoppingCart, LogOut, LayoutDashboard } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 const Navbar = () => {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const [cartCount, setCartCount] = useState(0);
+
+  // Fetch cart count when user logs in
+  useEffect(() => {
+    if (user && profile?.role === 'customer') {
+      fetchCartCount();
+      
+      // Set up real-time subscription for cart changes
+      const cartSubscription = supabase
+        .channel('cart_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'cart_items',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            fetchCartCount();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        cartSubscription.unsubscribe();
+      };
+    } else {
+      setCartCount(0);
+    }
+  }, [user, profile]);
+
+  const fetchCartCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('cart_items')
+        .select('quantity')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const total = data?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+      setCartCount(total);
+    } catch (error) {
+      console.error('Error fetching cart count:', error);
+      setCartCount(0);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
+    setCartCount(0);
     navigate('/login');
   };
 
@@ -26,9 +77,17 @@ const Navbar = () => {
               Products
             </Link>
             {user && profile?.role === 'customer' && (
-              <Link to="/cart" className="text-gray-700 hover:text-blue-600 transition flex items-center">
+              <Link 
+                to="/cart" 
+                className="text-gray-700 hover:text-blue-600 transition flex items-center relative"
+              >
                 <ShoppingCart size={20} className="mr-1" />
-                Cart
+                <span className="hidden sm:inline">Cart</span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
               </Link>
             )}
           </div>
@@ -71,6 +130,24 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Cart Icon (visible on small screens) */}
+      {user && profile?.role === 'customer' && (
+        <div className="md:hidden border-t border-gray-200">
+          <Link 
+            to="/cart" 
+            className="flex items-center justify-center py-3 text-gray-700 hover:bg-gray-50 relative"
+          >
+            <ShoppingCart size={20} className="mr-2" />
+            <span>Cart</span>
+            {cartCount > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
+          </Link>
+        </div>
+      )}
     </nav>
   );
 };
