@@ -26,17 +26,19 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      (async () => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      })();
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        (async () => {
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+            setLoading(false);
+          }
+        })();
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
@@ -58,28 +60,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ FIXED: Removed duplicate profile insert (trigger already handles it)
   const signUp = async (email, password, fullName, role) => {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role,
+          },
+        },
       });
 
       if (authError) throw authError;
 
       if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: authData.user.id,
-              email,
-              full_name: fullName,
-              role,
-            },
-          ]);
-
-        if (profileError) throw profileError;
+        // The trigger in the database will automatically create a profile
         await fetchProfile(authData.user.id);
       }
 
@@ -128,3 +126,4 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
