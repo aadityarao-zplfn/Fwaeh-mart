@@ -71,19 +71,30 @@ export const AuthProvider = ({ children }) => {
             full_name: fullName,
             role,
           },
+          // ✅ NEW: Redirect URL after email confirmation
+          emailRedirectTo: `${window.location.origin}/login`,
         },
       });
 
       if (authError) throw authError;
+
+      if (authData.user && !authData.session) {
+        // Email confirmation required
+        return { 
+          data: authData, 
+          error: null,
+          needsEmailConfirmation: true 
+        };
+      }
 
       if (authData.user) {
         // The trigger in the database will automatically create a profile
         await fetchProfile(authData.user.id);
       }
 
-      return { data: authData, error: null };
+      return { data: authData, error: null, needsEmailConfirmation: false };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error, needsEmailConfirmation: false };
     }
   };
 
@@ -95,6 +106,15 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (error) throw error;
+
+      if (data.user && !data.user.email_confirmed_at) {
+        return { 
+          data: null, 
+          error: { message: 'Please verify your email before signing in. Check your inbox for the confirmation link.' }
+        };
+      }
+
+
       if (data.user) {
         await fetchProfile(data.user.id);
       }
@@ -102,6 +122,24 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       return { data: null, error };
+    }
+  };
+
+  // ✅ NEW: Resend confirmation email
+  const resendConfirmationEmail = async (email) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+        }
+      });
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      return { error };
     }
   };
 
@@ -122,6 +160,7 @@ export const AuthProvider = ({ children }) => {
     signUp,
     signIn,
     signOut,
+    resendConfirmationEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

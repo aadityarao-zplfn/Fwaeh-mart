@@ -16,6 +16,18 @@ const Dashboard = () => {
     );
   }
 
+
+  if (!profile?.role) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Setting up your account...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
   // Customer Dashboard
   if (profile?.role === 'customer') {
     return (
