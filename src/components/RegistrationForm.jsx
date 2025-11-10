@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase"; // ✅ ADDED THIS MISSING IMPORT
 
 export default function RegistrationForm() {
   // Form states
@@ -22,7 +22,7 @@ export default function RegistrationForm() {
   // State management for form submission/feedback
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showEmailVerification, setShowEmailVerification] = useState(false); // ✅ NEW
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
 
   const navigate = useNavigate();
   const { signUp, resendConfirmationEmail } = useAuth();
@@ -96,7 +96,7 @@ export default function RegistrationForm() {
         return;
       }
 
-      // ✅ NEW: Show email verification message instead of immediate redirect
+      // Show email verification message instead of immediate redirect
       if (needsEmailConfirmation) {
         setShowEmailVerification(true);
         setIsLoading(false);
@@ -112,7 +112,7 @@ export default function RegistrationForm() {
     }
   };
 
-  // ✅ NEW: Handle resend confirmation email
+  // Handle resend confirmation email
   const handleResendEmail = async () => {
     setIsLoading(true);
     setError("");
@@ -136,7 +136,7 @@ export default function RegistrationForm() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/select-role`, // ✅ Changed from /dashboard
+          redirectTo: `${window.location.origin}/select-role`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -157,7 +157,7 @@ export default function RegistrationForm() {
     }
   };
 
-  // ✅ NEW: Email verification success screen
+  // Email verification success screen
   if (showEmailVerification) {
     return (
       <div
