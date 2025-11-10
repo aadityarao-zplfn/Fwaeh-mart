@@ -4,7 +4,7 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import RoleSelection from './pages/RoleSelection'; // NEW
+import RoleSelection from './pages/Roleselection'; // NEW
 import Products from './pages/Products';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
