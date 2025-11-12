@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadProductImage } from '../utils/uploadImage';
 import { X, Upload, Plus } from 'lucide-react';
 
 const ProductManagement = () => {
@@ -14,7 +15,7 @@ const ProductManagement = () => {
     name: '',
     description: '',
     price: '',
-    stock: '',
+    stock_quantity: '',
     category: '',
     image_url: ''
   });
@@ -40,6 +41,40 @@ const ProductManagement = () => {
     }
   };
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (JPEG, PNG, etc.)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    try {
+      // Upload to Supabase
+      const { url, error } = await uploadProductImage(file);
+
+      if (error) {
+        alert('Failed to upload image: ' + error);
+      } else {
+        // Auto-fill the image_url field
+        setFormData(prev => ({
+          ...prev,
+          image_url: url
+        }));
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Error uploading image');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -50,7 +85,7 @@ const ProductManagement = () => {
           .update({
             ...formData,
             price: parseFloat(formData.price),
-            stock: parseInt(formData.stock)
+            stock_quantity: parseInt(formData.stock_quantity)
           })
           .eq('id', editingProduct.id);
 
@@ -62,13 +97,13 @@ const ProductManagement = () => {
             ...formData,
             seller_id: user.id,
             price: parseFloat(formData.price),
-            stock: parseInt(formData.stock)
+            stock_quantity: parseInt(formData.stock_quantity)
           }]);
 
         if (error) throw error;
       }
 
-      setFormData({ name: '', description: '', price: '', stock: '', category: '', image_url: '' });
+      setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
       setShowForm(false);
       setEditingProduct(null);
       fetchProducts();
@@ -84,7 +119,7 @@ const ProductManagement = () => {
       name: product.name,
       description: product.description || '',
       price: product.price.toString(),
-      stock: product.stock.toString(),
+      stock_quantity: product.stock_quantity.toString(),
       category: product.category || '',
       image_url: product.image_url || ''
     });
@@ -109,7 +144,7 @@ const ProductManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '', price: '', stock: '', category: '', image_url: '' });
+    setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
     setShowForm(false);
     setEditingProduct(null);
   };
@@ -149,8 +184,62 @@ const ProductManagement = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Image Upload Section */}
               <div>
-                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>Product Name</label>
+                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
+                  Product Image
+                </label>
+                
+                {/* Image Preview */}
+                <div className="mb-4">
+                  <div className="w-48 h-48 border-2 border-dashed border-red-300 rounded-xl overflow-hidden bg-red-50 flex items-center justify-center mx-auto">
+                    {formData.image_url ? (
+                      <img
+                        src={formData.image_url}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-center text-red-400">
+                        <Upload size={48} className="mx-auto mb-2" />
+                        <p className="text-sm">No image selected</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Button */}
+                <label className="cursor-pointer block">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <div className="w-full px-4 py-3 border-2 border-red-500 text-red-600 rounded-xl hover:bg-red-50 text-center font-medium transition-all cursor-pointer">
+                    Choose Product Image
+                  </div>
+                </label>
+                
+                <p className="text-xs text-red-600 mt-2 text-center">
+                  PNG, JPG, WebP up to 5MB
+                </p>
+                
+                {/* Show status when image is uploaded */}
+                {formData.image_url && (
+                  <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
+                    <p className="text-xs text-green-700 text-center">
+                      ✅ Image uploaded successfully!
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Product Name - REQUIRED */}
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
+                  Product Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.name}
@@ -158,68 +247,82 @@ const ProductManagement = () => {
                   className="w-full px-4 py-3 rounded-xl border-2 outline-none"
                   style={{ background: '#fff5f5', borderColor: '#fca5a5', color: '#b91c1c' }}
                   required
+                  placeholder="Enter product name"
                 />
               </div>
 
+              {/* Description - OPTIONAL */}
               <div>
-                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>Description</label>
+                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
+                  Description
+                </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border-2 outline-none"
                   style={{ background: '#fff5f5', borderColor: '#fca5a5', color: '#b91c1c' }}
                   rows="3"
+                  placeholder="Describe your product (optional)"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
+                {/* Price - REQUIRED */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>Price ($)</label>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
+                    Price ($) <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border-2 outline-none"
                     style={{ background: '#fff5f5', borderColor: '#fca5a5', color: '#b91c1c' }}
                     required
+                    placeholder="0.00"
                   />
                 </div>
 
+                {/* Stock - REQUIRED */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>Stock</label>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
+                    Stock <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    min="0"
+                    value={formData.stock_quantity}
+                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border-2 outline-none"
                     style={{ background: '#fff5f5', borderColor: '#fca5a5', color: '#b91c1c' }}
                     required
+                    placeholder="0"
                   />
                 </div>
               </div>
 
+              {/* Category - OPTIONAL */}
               <div>
-                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>Category</label>
+                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
+                  Category
+                </label>
                 <input
                   type="text"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border-2 outline-none"
                   style={{ background: '#fff5f5', borderColor: '#fca5a5', color: '#b91c1c' }}
+                  placeholder="e.g., Electronics, Clothing (optional)"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>Image URL</label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 outline-none"
-                  style={{ background: '#fff5f5', borderColor: '#fca5a5', color: '#b91c1c' }}
-                  placeholder="https://example.com/image.jpg"
-                />
+              {/* Required Fields Note */}
+              <div className="pt-2">
+                <p className="text-xs text-red-600">
+                  <span className="text-red-500">*</span> Required fields
+                </p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -269,7 +372,7 @@ const ProductManagement = () => {
                 <p className="text-sm mb-3 line-clamp-2" style={{ color: '#dc2626' }}>{product.description}</p>
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-2xl font-bold" style={{ color: '#ff5757' }}>${product.price}</span>
-                  <span className="text-sm" style={{ color: '#dc2626' }}>Stock: {product.stock}</span>
+                  <span className="text-sm" style={{ color: '#dc2626' }}>Stock: {product.stock_quantity}</span>
                 </div>
                 <div className="flex gap-2">
                   <button

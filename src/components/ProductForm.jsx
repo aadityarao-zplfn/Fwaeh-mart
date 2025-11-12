@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { uploadProductImage } from '../utils/uploadImage';
+import { useAuth } from '../contexts/AuthContext'; // Adjust path as needed
+import toast from 'react-hot-toast'; // Make sure you have toast installed
 
 const ProductForm = ({ product, onClose }) => {
   const [formData, setFormData] = useState({
@@ -12,8 +14,11 @@ const ProductForm = ({ product, onClose }) => {
     image_url: '',
   });
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
   const { user } = useAuth();
 
+  // 🔥 CRITICAL: Populate form when editing existing product
   useEffect(() => {
     if (product) {
       setFormData({
@@ -34,40 +39,78 @@ const ProductForm = ({ product, onClose }) => {
     });
   };
 
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to Supabase
+    setUploading(true);
+    const { url, error } = await uploadProductImage(file);
+    setUploading(false);
+
+    if (error) {
+      alert('Failed to upload image: ' + error);
+      setImagePreview(null);
+    } else {
+      setFormData({ ...formData, image_url: url });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    if (!formData.name || !formData.price || !formData.category || !formData.stock_quantity) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (product) {
+        // Update existing product
         const { error } = await supabase
           .from('products')
           .update({
             ...formData,
+            price: parseFloat(formData.price), // Ensure number type
+            stock_quantity: parseInt(formData.stock_quantity),
             updated_at: new Date().toISOString(),
           })
           .eq('id', product.id);
 
         if (error) throw error;
-        alert('Product updated successfully!');
+        toast.success('Product updated successfully!');
       } else {
+        // Create new product
         const { error } = await supabase
           .from('products')
           .insert([
             {
               ...formData,
+              price: parseFloat(formData.price),
+              stock_quantity: parseInt(formData.stock_quantity),
               seller_id: user.id,
+              created_at: new Date().toISOString(),
             },
           ]);
 
         if (error) throw error;
-        alert('Product added successfully!');
+        toast.success('Product added successfully!');
       }
 
       onClose();
     } catch (error) {
       console.error('Error saving product:', error);
-      alert('Failed to save product');
+      toast.error('Failed to save product: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -90,6 +133,59 @@ const ProductForm = ({ product, onClose }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Image Upload Section */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Product Image
+              </label>
+              <div className="flex items-center space-x-4">
+                {/* Image Preview */}
+                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-xs text-gray-500 mt-1">No image</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Button */}
+                <div className="flex-1">
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      disabled={uploading}
+                    />
+                    <div className={`px-4 py-2 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 text-center font-medium transition ${
+                      uploading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}>
+                      {uploading ? 'Uploading...' : 'Choose Image'}
+                    </div>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    PNG, JPG up to 5MB
+                  </p>
+                  {formData.image_url && (
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓ Image ready to save
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Rest of form fields */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                 Product Name *
@@ -99,7 +195,7 @@ const ProductForm = ({ product, onClose }) => {
                 name="name"
                 type="text"
                 required
-                className="input"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.name}
                 onChange={handleChange}
               />
@@ -113,7 +209,7 @@ const ProductForm = ({ product, onClose }) => {
                 id="description"
                 name="description"
                 rows="3"
-                className="input"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.description}
                 onChange={handleChange}
               />
@@ -131,7 +227,7 @@ const ProductForm = ({ product, onClose }) => {
                   step="0.01"
                   min="0"
                   required
-                  className="input"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.price}
                   onChange={handleChange}
                 />
@@ -147,7 +243,7 @@ const ProductForm = ({ product, onClose }) => {
                   type="number"
                   min="0"
                   required
-                  className="input"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.stock_quantity}
                   onChange={handleChange}
                 />
@@ -158,45 +254,39 @@ const ProductForm = ({ product, onClose }) => {
               <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
                 Category *
               </label>
-              <input
+              <select
                 id="category"
                 name="category"
-                type="text"
                 required
-                className="input"
-                placeholder="e.g., Electronics, Clothing, Food"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.category}
                 onChange={handleChange}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="image_url" className="block text-sm font-medium text-gray-700 mb-1">
-                Image URL
-              </label>
-              <input
-                id="image_url"
-                name="image_url"
-                type="url"
-                className="input"
-                placeholder="https://example.com/image.jpg"
-                value={formData.image_url}
-                onChange={handleChange}
-              />
+              >
+                <option value="">Select a category</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Clothing">Clothing</option>
+                <option value="Food & Beverages">Food & Beverages</option>
+                <option value="Home & Garden">Home & Garden</option>
+                <option value="Sports & Outdoors">Sports & Outdoors</option>
+                <option value="Books & Media">Books & Media</option>
+                <option value="Toys & Games">Toys & Games</option>
+                <option value="Health & Beauty">Health & Beauty</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             <div className="flex space-x-4 pt-4">
               <button
                 type="submit"
-                disabled={loading}
-                className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || uploading}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Saving...' : product ? 'Update Product' : 'Add Product'}
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 btn-secondary"
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
               >
                 Cancel
               </button>
