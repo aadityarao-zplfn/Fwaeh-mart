@@ -63,28 +63,43 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
+    <nav 
+      className="shadow-md sticky top-0 z-50"
+      style={{ background: 'linear-gradient(to right, #fff5f5, #ffe8e8)' }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="text-2xl font-bold text-blue-600">
+          <Link 
+            to="/" 
+            className="text-2xl font-bold transition-all hover:opacity-80"
+            style={{ color: '#b91c1c' }}
+          >
             Fwaeh Mart
           </Link>
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-6">
-            <Link to="/products" className="text-gray-700 hover:text-blue-600 transition">
+            <Link 
+              to="/products" 
+              className="font-medium transition-all hover:opacity-80"
+              style={{ color: '#dc2626' }}
+            >
               Products
             </Link>
             {user && profile?.role === 'customer' && (
               <Link 
                 to="/cart" 
-                className="text-gray-700 hover:text-blue-600 transition flex items-center relative"
+                className="font-medium transition-all hover:opacity-80 flex items-center relative"
+                style={{ color: '#dc2626' }}
               >
                 <ShoppingCart size={20} className="mr-1" />
                 <span className="hidden sm:inline">Cart</span>
                 {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  <span 
+                    className="absolute -top-2 -right-2 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
+                  >
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>
                 )}
@@ -98,30 +113,40 @@ const Navbar = () => {
               <>
                 <Link
                   to="/dashboard"
-                  className="flex items-center text-gray-700 hover:text-blue-600 transition"
+                  className="flex items-center font-medium transition-all hover:opacity-80"
+                  style={{ color: '#dc2626' }}
                 >
                   <LayoutDashboard size={20} className="mr-1" />
                   <span className="hidden sm:inline">Dashboard</span>
                 </Link>
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center text-gray-700 hover:text-red-600 transition"
+                  className="flex items-center font-medium transition-all hover:opacity-80"
+                  style={{ color: '#dc2626' }}
                 >
                   <LogOut size={20} className="mr-1" />
                   <span className="hidden sm:inline">Logout</span>
                 </button>
-                <div className="text-sm text-gray-600 hidden lg:block">
+                <div 
+                  className="text-sm hidden lg:block font-medium"
+                  style={{ color: '#b91c1c' }}
+                >
                   {profile?.full_name}
                 </div>
               </>
             ) : (
               <>
-                <Link to="/login" className="text-gray-700 hover:text-blue-600 transition">
+                <Link 
+                  to="/login" 
+                  className="font-medium transition-all hover:opacity-80"
+                  style={{ color: '#dc2626' }}
+                >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                  className="px-4 py-2 rounded-lg font-medium text-white transition-all shadow-md hover:shadow-lg hover:opacity-90"
+                  style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
                 >
                   Sign Up
                 </Link>
@@ -133,15 +158,22 @@ const Navbar = () => {
 
       {/* Mobile Cart Icon (visible on small screens) */}
       {user && profile?.role === 'customer' && (
-        <div className="md:hidden border-t border-gray-200">
+        <div 
+          className="md:hidden border-t"
+          style={{ borderColor: '#fca5a5' }}
+        >
           <Link 
             to="/cart" 
-            className="flex items-center justify-center py-3 text-gray-700 hover:bg-gray-50 relative"
+            className="flex items-center justify-center py-3 font-medium transition-all relative"
+            style={{ color: '#dc2626' }}
           >
             <ShoppingCart size={20} className="mr-2" />
             <span>Cart</span>
             {cartCount > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+              <span 
+                className="ml-2 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
+              >
                 {cartCount > 99 ? '99+' : cartCount}
               </span>
             )}
