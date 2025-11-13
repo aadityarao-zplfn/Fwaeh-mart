@@ -17,7 +17,6 @@ const Products = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const { user } = useAuth();
 
   // Debounced search function
@@ -28,10 +27,10 @@ const Products = () => {
     []
   );
 
-  // Use React Query hooks with debounced search
+  // Use React Query hooks with debounced search - SIMPLIFIED
   const { data: products = [], isLoading, error } = useProducts({
     search: debouncedSearch,
-    category: categoryFilter,
+    category: categoryFilter === 'all' ? undefined : categoryFilter,
     minPrice: priceRange[0],
     maxPrice: priceRange[1],
   });
@@ -51,8 +50,6 @@ const Products = () => {
         },
         (payload) => {
           console.log('Product changed:', payload);
-          // React Query will automatically refetch
-          window.location.reload(); // Simple refresh for real-time updates
         }
       )
       .subscribe();
@@ -62,21 +59,26 @@ const Products = () => {
     };
   }, []);
 
-  // Extract categories and set price range when products load
+  // Extract categories only once when products first load
   useEffect(() => {
-    if (products.length > 0) {
+    if (products.length > 0 && categories.length === 0) {
       const uniqueCategories = [...new Set(products.map(p => p.category))];
       setCategories(uniqueCategories);
+    }
+  }, [products, categories.length]);
 
+  // Set price range only once when products first load
+  useEffect(() => {
+    if (products.length > 0 && priceRange[1] === 1000) {
       const maxPrice = Math.max(...products.map(p => parseFloat(p.price || 0)));
-      if (priceRange[1] === 1000) { // Only set once on initial load
+      if (maxPrice > 0) {
         setPriceRange([0, Math.ceil(maxPrice)]);
       }
     }
-  }, [products]);
+  }, [products, priceRange[1]]);
 
-  // Filter and sort products
-  useEffect(() => {
+  // Filter and sort products - SIMPLIFIED to avoid state updates
+  const filteredProducts = useCallback(() => {
     let filtered = [...products];
 
     // Stock filter
@@ -87,22 +89,16 @@ const Products = () => {
     // Sort
     switch (sortBy) {
       case 'price-low':
-        filtered.sort((a, b) => parseFloat(a.price || 0) - parseFloat(b.price || 0));
-        break;
+        return filtered.sort((a, b) => parseFloat(a.price || 0) - parseFloat(b.price || 0));
       case 'price-high':
-        filtered.sort((a, b) => parseFloat(b.price || 0) - parseFloat(a.price || 0));
-        break;
+        return filtered.sort((a, b) => parseFloat(b.price || 0) - parseFloat(a.price || 0));
       case 'name':
-        filtered.sort((a, b) => a.name.localeCompare(b.name));
-        break;
+        return filtered.sort((a, b) => a.name.localeCompare(b.name));
       case 'newest':
       default:
-        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        break;
+        return filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
-
-    setFilteredProducts(filtered);
-  }, [products, showInStock, sortBy]);
+  }, [products, showInStock, sortBy])();
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -129,8 +125,12 @@ const Products = () => {
     setCategoryFilter('all');
     setSortBy('newest');
     setShowInStock(false);
-    const maxPrice = Math.max(...products.map(p => parseFloat(p.price || 0)));
-    setPriceRange([0, Math.ceil(maxPrice)]);
+    if (products.length > 0) {
+      const maxPrice = Math.max(...products.map(p => parseFloat(p.price || 0)));
+      setPriceRange([0, Math.ceil(maxPrice)]);
+    } else {
+      setPriceRange([0, 1000]);
+    }
   };
 
   // Loading Skeleton

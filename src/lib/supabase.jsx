@@ -1,11 +1,20 @@
-import { createClient } from '@supabase/supabase-js'
+// src/lib/supabase.jsx
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_CONFIG, validateConfig } from '../config/supabase.config';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase environment variables!')
-  console.log('Make sure .env file has VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
-}
+// ✅ Validate configuration on import
+validateConfig();
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// ✅ Create Supabase client with proper configuration
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: AUTH_CONFIG,
+  global: {
+    headers: {
+      'x-application-name': 'fwaeh-mart',
+    },
+  },
+});
+
+// ✅ Export config for debugging
+export { SUPABASE_URL, SUPABASE_ANON_KEY };

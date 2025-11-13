@@ -17,26 +17,44 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
+    // ✅ FIX: Better session initialization
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
         setLoading(false);
       }
-    });
+    };
 
+    initAuth();
+
+    // ✅ FIX: Better auth state change handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        (async () => {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          } else {
-            setProfile(null);
-            setLoading(false);
-          }
-        })();
+      async (event, session) => {
+        console.log('Auth event:', event); // Debug logging
+        
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+          setLoading(false);
+        }
       }
     );
 
@@ -51,16 +69,21 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching profile:', error);
+        throw error;
+      }
+      
       setProfile(data);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error in fetchProfile:', error);
+      // ✅ Don't block the app if profile fetch fails
+      setProfile(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ FIXED: Removed duplicate profile insert (trigger already handles it)
   const signUp = async (email, password, fullName, role) => {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -71,7 +94,6 @@ export const AuthProvider = ({ children }) => {
             full_name: fullName,
             role,
           },
-          // ✅ NEW: Redirect URL after email confirmation
           emailRedirectTo: `${window.location.origin}/login`,
         },
       });
@@ -79,7 +101,6 @@ export const AuthProvider = ({ children }) => {
       if (authError) throw authError;
 
       if (authData.user && !authData.session) {
-        // Email confirmation required
         return { 
           data: authData, 
           error: null,
@@ -88,7 +109,6 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (authData.user) {
-        // The trigger in the database will automatically create a profile
         await fetchProfile(authData.user.id);
       }
 
@@ -107,13 +127,15 @@ export const AuthProvider = ({ children }) => {
 
       if (error) throw error;
 
+      // ✅ FIX: Better email verification check
       if (data.user && !data.user.email_confirmed_at) {
+        // Sign out if not verified
+        await supabase.auth.signOut();
         return { 
           data: null, 
           error: { message: 'Please verify your email before signing in. Check your inbox for the confirmation link.' }
         };
       }
-
 
       if (data.user) {
         await fetchProfile(data.user.id);
@@ -125,7 +147,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ NEW: Resend confirmation email
   const resendConfirmationEmail = async (email) => {
     try {
       const { error } = await supabase.auth.resend({
@@ -145,9 +166,16 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
+      // ✅ FIX: Clear all auth data properly
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      setUser(null);
       setProfile(null);
+      
+      // ✅ Clear any cached data
+      window.localStorage.removeItem('fwaeh-mart-auth');
+      
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -165,4 +193,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
