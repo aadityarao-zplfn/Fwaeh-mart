@@ -9,4 +9,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // ADD THIS for Vercel
+  build: {
+    outDir: 'dist'
+  }
 })
