@@ -4,6 +4,7 @@ import { uploadProductImage } from '../utils/uploadImage';
 import { useAuth } from '../contexts/AuthContext'; // Adjust path as needed
 import toast from 'react-hot-toast'; // Make sure you have toast installed
 
+
 const ProductForm = ({ product, onClose }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -55,12 +56,13 @@ const ProductForm = ({ product, onClose }) => {
     const { url, error } = await uploadProductImage(file);
     setUploading(false);
 
-    if (error) {
-      alert('Failed to upload image: ' + error);
-      setImagePreview(null);
-    } else {
-      setFormData({ ...formData, image_url: url });
-    }
+if (error) {
+  toast.error(`Failed to upload image: ${error}`);
+  setImagePreview(null);
+} else {
+  toast.success('Image uploaded successfully!');
+  setFormData({ ...formData, image_url: url });
+}
   };
 
   const handleSubmit = async (e) => {

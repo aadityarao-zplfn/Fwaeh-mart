@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
+
 
 const Cart = () => {
   const [cartItems, setCartItems] = useState([]);
@@ -71,7 +73,7 @@ const Cart = () => {
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
-      alert('Your cart is empty');
+    toast.error('Your cart is empty!');
       return;
     }
     navigate('/checkout');
@@ -164,7 +166,7 @@ const Cart = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-semibold">$0.00</span>
+                  <span className="font-semibold">₹.00</span>
                 </div>
                 <div className="border-t pt-2 flex justify-between">
                   <span className="text-lg font-bold">Total</span>

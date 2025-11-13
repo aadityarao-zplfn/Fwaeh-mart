@@ -2,13 +2,18 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadProductImage } from '../utils/uploadImage';
-import { X, Upload, Plus } from 'lucide-react';
+import { X, Upload, Plus, Edit, Save, Eye } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState(new Set());
+  const [editingId, setEditingId] = useState(null);
+  const [quickEditData, setQuickEditData] = useState({});
+  const [hoveredImage, setHoveredImage] = useState(null);
   const { user } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -36,42 +41,144 @@ const ProductManagement = () => {
       setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
+      toast.error('Failed to load products');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Bulk actions
+  const handleBulkAction = async (action) => {
+    if (selectedProducts.size === 0) {
+      toast.error('Please select products to perform bulk action');
+      return;
+    }
+
+    try {
+      const productIds = Array.from(selectedProducts);
+      const toastId = toast.loading(`Processing ${productIds.length} product(s)...`);
+      
+      if (action === 'delete') {
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .in('id', productIds);
+
+        if (error) throw error;
+        toast.success(`Successfully deleted ${productIds.length} product(s)`, { id: toastId });
+      } else if (action === 'activate' || action === 'deactivate') {
+        const { error } = await supabase
+          .from('products')
+          .update({ active: action === 'activate' })
+          .in('id', productIds);
+
+        if (error) throw error;
+        toast.success(`${action === 'activate' ? 'Activated' : 'Deactivated'} ${productIds.length} product(s)`, { id: toastId });
+      }
+
+      setSelectedProducts(new Set());
+      fetchProducts();
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+      toast.error(`Error: ${error.message}`);
+    }
+  };
+
+  const toggleProductSelection = (productId) => {
+    const newSelected = new Set(selectedProducts);
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId);
+    } else {
+      newSelected.add(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const selectAllProducts = () => {
+    if (selectedProducts.size === products.length) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(products.map(p => p.id)));
+    }
+  };
+
+  // Quick edit inline
+  const startQuickEdit = (product) => {
+    setEditingId(product.id);
+    setQuickEditData({
+      name: product.name,
+      price: product.price.toString(),
+      stock_quantity: product.stock_quantity.toString()
+    });
+  };
+
+  const cancelQuickEdit = () => {
+    setEditingId(null);
+    setQuickEditData({});
+    toast('Quick edit cancelled');
+  };
+
+  const saveQuickEdit = async (productId) => {
+    try {
+      const toastId = toast.loading('Updating product...');
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name: quickEditData.name,
+          price: parseFloat(quickEditData.price),
+          stock_quantity: parseInt(quickEditData.stock_quantity)
+        })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      setEditingId(null);
+      setQuickEditData({});
+      toast.success('Product updated successfully!', { id: toastId });
+      fetchProducts();
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast.error(`Error updating product: ${error.message}`);
+    }
+  };
+
+  const handleQuickEditChange = (field, value) => {
+    setQuickEditData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (JPEG, PNG, etc.)');
+      toast.error('Please select an image file (JPEG, PNG, etc.)');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      toast.error('File size must be less than 5MB');
       return;
     }
 
     try {
-      // Upload to Supabase
+      const toastId = toast.loading('Uploading image...');
       const { url, error } = await uploadProductImage(file);
 
       if (error) {
-        alert('Failed to upload image: ' + error);
+        toast.error(`Failed to upload image: ${error}`, { id: toastId });
       } else {
-        // Auto-fill the image_url field
         setFormData(prev => ({
           ...prev,
           image_url: url
         }));
+        toast.success('Image uploaded successfully!', { id: toastId });
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Error uploading image');
+      toast.error('Error uploading image');
     }
   };
 
@@ -79,6 +186,8 @@ const ProductManagement = () => {
     e.preventDefault();
     
     try {
+      const toastId = toast.loading(editingProduct ? 'Updating product...' : 'Adding product...');
+      
       if (editingProduct) {
         const { error } = await supabase
           .from('products')
@@ -90,6 +199,7 @@ const ProductManagement = () => {
           .eq('id', editingProduct.id);
 
         if (error) throw error;
+        toast.success('Product updated successfully!', { id: toastId });
       } else {
         const { error } = await supabase
           .from('products')
@@ -101,6 +211,7 @@ const ProductManagement = () => {
           }]);
 
         if (error) throw error;
+        toast.success('Product added successfully!', { id: toastId });
       }
 
       setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
@@ -109,7 +220,7 @@ const ProductManagement = () => {
       fetchProducts();
     } catch (error) {
       console.error('Error saving product:', error);
-      alert('Error saving product: ' + error.message);
+      toast.error(`Error saving product: ${error.message}`);
     }
   };
 
@@ -127,19 +238,19 @@ const ProductManagement = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-
     try {
+      const toastId = toast.loading('Deleting product...');
       const { error } = await supabase
         .from('products')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+      toast.success('Product deleted successfully!', { id: toastId });
       fetchProducts();
     } catch (error) {
       console.error('Error deleting product:', error);
-      alert('Error deleting product: ' + error.message);
+      toast.error(`Error deleting product: ${error.message}`);
     }
   };
 
@@ -147,6 +258,7 @@ const ProductManagement = () => {
     setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
     setShowForm(false);
     setEditingProduct(null);
+    toast('Form cancelled');
   };
 
   if (loading) {
@@ -170,6 +282,47 @@ const ProductManagement = () => {
           Add New Product
         </button>
       </div>
+
+      {/* Bulk Actions */}
+      {products.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selectedProducts.size === products.length && products.length > 0}
+              onChange={selectAllProducts}
+              className="rounded border-red-300 text-red-600 focus:ring-red-500"
+            />
+            <span className="text-sm font-medium" style={{ color: '#b91c1c' }}>
+              Select All ({selectedProducts.size} selected)
+            </span>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleBulkAction('activate')}
+              className="px-3 py-2 text-sm rounded-lg font-medium transition-all"
+              style={{ background: '#fff5f5', color: '#16a34a', border: '2px solid #86efac' }}
+            >
+              Activate Selected
+            </button>
+            <button
+              onClick={() => handleBulkAction('deactivate')}
+              className="px-3 py-2 text-sm rounded-lg font-medium transition-all"
+              style={{ background: '#fff5f5', color: '#dc2626', border: '2px solid #fca5a5' }}
+            >
+              Deactivate Selected
+            </button>
+            <button
+              onClick={() => handleBulkAction('delete')}
+              className="px-3 py-2 text-sm rounded-lg font-medium text-white transition-all"
+              style={{ background: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)' }}
+            >
+              Delete Selected
+            </button>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -224,15 +377,6 @@ const ProductManagement = () => {
                 <p className="text-xs text-red-600 mt-2 text-center">
                   PNG, JPG, WebP up to 5MB
                 </p>
-                
-                {/* Show status when image is uploaded */}
-                {formData.image_url && (
-                  <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
-                    <p className="text-xs text-green-700 text-center">
-                      ✅ Image uploaded successfully!
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Product Name - REQUIRED */}
@@ -362,33 +506,154 @@ const ProductManagement = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => (
             <div key={product.id} className="rounded-xl overflow-hidden shadow-lg" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
-              <img
-                src={product.image_url || 'https://images.pexels.com/photos/4483610/pexels-photo-4483610.jpeg?auto=compress&cs=tinysrgb&w=400'}
-                alt={product.name}
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h3 className="text-lg font-bold mb-2" style={{ color: '#b91c1c' }}>{product.name}</h3>
-                <p className="text-sm mb-3 line-clamp-2" style={{ color: '#dc2626' }}>{product.description}</p>
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-2xl font-bold" style={{ color: '#ff5757' }}>${product.price}</span>
-                  <span className="text-sm" style={{ color: '#dc2626' }}>Stock: {product.stock_quantity}</span>
+              {/* Image with hover preview */}
+              <div 
+                className="relative w-full h-48 overflow-hidden"
+                onMouseEnter={() => setHoveredImage(product.id)}
+                onMouseLeave={() => setHoveredImage(null)}
+              >
+                <img
+                  src={product.image_url || 'https://images.pexels.com/photos/4483610/pexels-photo-4483610.jpeg?auto=compress&cs=tinysrgb&w=400'}
+                  alt={product.name}
+                  className="w-full h-48 object-cover transition-transform duration-300"
+                />
+                
+                {/* Image preview overlay */}
+                {hoveredImage === product.id && (
+                  <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center">
+                    <div className="text-center text-white p-4">
+                      <Eye size={32} className="mx-auto mb-2" />
+                      <p className="text-sm">Click Edit to change image</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Selection checkbox */}
+                <div className="absolute top-2 left-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.has(product.id)}
+                    onChange={() => toggleProductSelection(product.id)}
+                    className="rounded border-red-300 text-red-600 focus:ring-red-500 w-5 h-5"
+                  />
                 </div>
+              </div>
+
+              <div className="p-4">
+                {/* Stock Alert */}
+                {product.stock_quantity <= 5 && product.stock_quantity > 0 && (
+                  <div className="bg-orange-100 border-l-4 border-orange-500 p-3 mb-4">
+                    <p className="text-sm text-orange-700">
+                      ⚠️ Low stock alert! Only {product.stock_quantity} units remaining
+                    </p>
+                  </div>
+                )}
+
+                {/* Quick Edit Fields */}
+                {editingId === product.id ? (
+                  <div className="space-y-3 mb-4">
+                    <input
+                      type="text"
+                      value={quickEditData.name || ''}
+                      onChange={(e) => handleQuickEditChange('name', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border-2 outline-none text-sm"
+                      style={{ background: '#fff', borderColor: '#fca5a5', color: '#b91c1c' }}
+                      placeholder="Product name"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={quickEditData.price || ''}
+                        onChange={(e) => handleQuickEditChange('price', e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border-2 outline-none text-sm"
+                        style={{ background: '#fff', borderColor: '#fca5a5', color: '#b91c1c' }}
+                        placeholder="Price"
+                      />
+                      <input
+                        type="number"
+                        value={quickEditData.stock_quantity || ''}
+                        onChange={(e) => handleQuickEditChange('stock_quantity', e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border-2 outline-none text-sm"
+                        style={{ background: '#fff', borderColor: '#fca5a5', color: '#b91c1c' }}
+                        placeholder="Stock"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-bold mb-2" style={{ color: '#b91c1c' }}>{product.name}</h3>
+                    <p className="text-sm mb-3 line-clamp-2" style={{ color: '#dc2626' }}>{product.description}</p>
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-2xl font-bold" style={{ color: '#ff5757' }}>${product.price}</span>
+                      <span className="text-sm" style={{ color: '#dc2626' }}>Stock: {product.stock_quantity}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* Quick Stats */}
+                <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+                  <div className="bg-blue-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">Views</p>
+                    <p className="font-bold text-blue-600">0</p>
+                  </div>
+                  <div className="bg-green-100 p-2 rounded">
+                    <p className="text-xs text-gray-600">Sold</p>
+                    <p className="font-bold text-green-600">0</p>
+                  </div>
+                  <div className="bg-rose-200 p-2 rounded">
+                    <p className="text-xs text-gray-600">Rating</p>
+                    <p className="font-bold text-rose-600">⭐ 0</p>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(product)}
-                    className="flex-1 py-2 rounded-lg font-medium text-white transition-all"
-                    style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    className="flex-1 py-2 rounded-lg font-medium transition-all"
-                    style={{ background: '#fff5f5', color: '#b91c1c', border: '2px solid #fca5a5' }}
-                  >
-                    Delete
-                  </button>
+                  {editingId === product.id ? (
+                    <>
+                      <button
+                        onClick={() => saveQuickEdit(product.id)}
+                        className="flex items-center justify-center flex-1 py-2 rounded-lg text-sm text-white transition-all"
+                        style={{ background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }}
+                      >
+                        <Save size={14} className="mr-1" />
+                        Save
+                      </button>
+                      <button
+                        onClick={cancelQuickEdit}
+                        className="flex-1 py-2 rounded-lg text-sm transition-all"
+                        style={{ background: '#fff5f5', color: '#b91c1c', border: '2px solid #fca5a5' }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => startQuickEdit(product)}
+                        className="flex items-center justify-center flex-1 py-2 rounded-lg text-sm text-white transition-all"
+style={{ background: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' }}
+
+                      >
+                        <Edit size={14} className="mr-1" />
+                        Quick Edit
+                      </button>
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="flex-1 py-2 rounded-lg text-sm text-white transition-all"
+                        style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
+                      >
+                        Full Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="flex-1 py-2 rounded-lg text-sm transition-all"
+                        style={{ background: '#fff5f5', color: '#b91c1c', border: '2px solid #fca5a5' }}
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

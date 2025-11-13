@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
+
 
 const Checkout = () => {
   const [cartItems, setCartItems] = useState([]);
@@ -42,76 +44,78 @@ const Checkout = () => {
     }, 0);
   };
 
-  const handlePlaceOrder = async () => {
-    if (!shippingAddress.trim()) {
-      alert('Please enter a shipping address');
-      return;
+
+const handlePlaceOrder = async () => {
+  if (!shippingAddress.trim()) {
+    toast.error('Please enter a shipping address');
+    return;
+  }
+
+  if (cartItems.length === 0) {
+    toast.error('Your cart is empty');
+    return;
+  }
+
+  setPlacing(true);
+  const toastId = toast.loading('Placing your order...');
+
+  try {
+    const totalAmount = calculateTotal();
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert([
+        {
+          user_id: user.id,
+          total_amount: totalAmount,
+          shipping_address: shippingAddress,
+          status: 'pending',
+        },
+      ])
+      .select()
+      .single();
+
+    if (orderError) throw orderError;
+
+    const orderItems = cartItems.map((item) => ({
+      order_id: order.id,
+      product_id: item.product_id,
+      seller_id: item.products.seller_id,
+      quantity: item.quantity,
+      price_at_purchase: item.products.price,
+    }));
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems);
+
+    if (itemsError) throw itemsError;
+
+    // Update product stock quantities
+    for (const item of cartItems) {
+      const newStock = item.products.stock_quantity - item.quantity;
+      await supabase
+        .from('products')
+        .update({ stock_quantity: newStock })
+        .eq('id', item.product_id);
     }
 
-    if (cartItems.length === 0) {
-      alert('Your cart is empty');
-      return;
-    }
+    const { error: clearCartError } = await supabase
+      .from('cart_items')
+      .delete()
+      .eq('user_id', user.id);
 
-    setPlacing(true);
+    if (clearCartError) throw clearCartError;
 
-    try {
-      const totalAmount = calculateTotal();
-
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([
-          {
-            user_id: user.id,
-            total_amount: totalAmount,
-            shipping_address: shippingAddress,
-            status: 'pending',
-          },
-        ])
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const orderItems = cartItems.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        seller_id: item.products.seller_id,
-        quantity: item.quantity,
-        price_at_purchase: item.products.price,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      for (const item of cartItems) {
-        const newStock = item.products.stock_quantity - item.quantity;
-        await supabase
-          .from('products')
-          .update({ stock_quantity: newStock })
-          .eq('id', item.product_id);
-      }
-
-      const { error: clearCartError } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (clearCartError) throw clearCartError;
-
-      alert('Order placed successfully!');
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error placing order:', error);
-      alert('Failed to place order. Please try again.');
-    } finally {
-      setPlacing(false);
-    }
-  };
-
+    toast.success('Order placed successfully!', { id: toastId });
+    navigate('/dashboard');
+  } catch (error) {
+    console.error('Error placing order:', error);
+    toast.error('Failed to place order. Please try again.', { id: toastId });
+  } finally {
+    setPlacing(false);
+  }
+};
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -172,7 +176,7 @@ const Checkout = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Shipping</span>
-                <span className="font-semibold">$0.00</span>
+                <span className="font-semibold">₹.00</span>
               </div>
               <div className="border-t pt-2 flex justify-between">
                 <span className="text-lg font-bold">Total</span>

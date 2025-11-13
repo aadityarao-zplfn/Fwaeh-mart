@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import toast from 'react-hot-toast';
 import { supabase } from "../lib/supabase";
 import { LoadingSpinner, LoadingButton } from "../components/ui/LoadingSpinner";
 
@@ -103,8 +104,8 @@ export default function RegistrationForm() {
         setIsLoading(false);
       } else {
         // If no email confirmation needed (shouldn't happen in production)
-        alert("Registration successful!");
-        navigate('/login');
+      toast.success('Registration successful!');
+     navigate('/login');
       }
 
     } catch (err) {
@@ -123,7 +124,7 @@ export default function RegistrationForm() {
     if (resendError) {
       setError(resendError.message);
     } else {
-      alert("Confirmation email resent! Please check your inbox.");
+     toast.success('Confirmation email resent! Please check your inbox.');
     }
     
     setIsLoading(false);

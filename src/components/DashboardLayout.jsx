@@ -9,7 +9,7 @@ export default function DashboardPage() {
   const stats = [
     { icon: ShoppingCart, label: "Total Orders", value: "1,234", change: "+12.5%" },
     { icon: Users, label: "Total Customers", value: "5,678", change: "+8.2%" },
-    { icon: TrendingUp, label: "Revenue", value: "$45,231", change: "+23.1%" },
+    { icon: TrendingUp, label: "Revenue", value: "₹5,231", change: "+23.1%" },
     { icon: BarChart3, label: "Conversion Rate", value: "3.24%", change: "+1.2%" },
   ]
 

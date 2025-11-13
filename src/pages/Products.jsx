@@ -6,6 +6,8 @@ import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
 import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { debounce } from '../utils/debounce';
+import toast from 'react-hot-toast';
+
 
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -106,11 +108,11 @@ const Products = () => {
     debouncedSearchUpdate(value);
   };
 
-  const addToCart = async (productId) => {
-    if (!user) {
-      alert('Please login to add items to cart');
-      return;
-    }
+ const addToCart = async (productId) => {
+  if (!user) {
+    toast.error('Please login to add items to cart');
+    return;
+  }
 
     addToCartMutation.mutate({
       userId: user.id,

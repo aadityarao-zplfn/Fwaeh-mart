@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { X, Minus, Plus, ShoppingCart, Store } from 'lucide-react';
+import toast from 'react-hot-toast';
+
 
 const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
@@ -11,19 +13,23 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
     
     setIsLoading(true);
     try {
-      for (let i = 0; i < quantity; i++) {
-        if (onAddToCart) {
-          await onAddToCart(product.id);
-        }
-      }
-      alert(`Added ${quantity} item(s) to cart! 🛒`);
-      onClose();
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      alert('Failed to add to cart');
-    } finally {
-      setIsLoading(false);
+  const toastId = toast.loading(`Adding ${quantity} item(s) to cart...`);
+  
+  for (let i = 0; i < quantity; i++) {
+    if (onAddToCart) {
+      await onAddToCart(product.id);
     }
+  }
+  
+  toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
+  onClose();
+} catch (error) {
+  console.error('Error adding to cart:', error);
+  toast.error('Failed to add to cart');
+} finally {
+  setIsLoading(false);
+}
+
   };
 
   const incrementQuantity = () => {
