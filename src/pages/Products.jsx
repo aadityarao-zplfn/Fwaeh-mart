@@ -1,79 +1,83 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useProducts, useAddToCart } from '../hooks/useProducts';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
 import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { debounce } from '../utils/debounce';
 
 const Products = () => {
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [priceRange, setPriceRange] = useState([0, 1000]);
   const [showInStock, setShowInStock] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null); // NEW: For modal
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const { user } = useAuth();
 
+  // Debounced search function
+  const debouncedSearchUpdate = useCallback(
+    debounce((value) => {
+      setDebouncedSearch(value);
+    }, 500),
+    []
+  );
+
+  // Use React Query hooks with debounced search
+  const { data: products = [], isLoading, error } = useProducts({
+    search: debouncedSearch,
+    category: categoryFilter,
+    minPrice: priceRange[0],
+    maxPrice: priceRange[1],
+  });
+
+  const addToCartMutation = useAddToCart();
+
+  // Set up real-time subscription for instant updates
   useEffect(() => {
-    fetchProducts();
+    const productsSubscription = supabase
+      .channel('products_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products',
+        },
+        (payload) => {
+          console.log('Product changed:', payload);
+          // React Query will automatically refetch
+          window.location.reload(); // Simple refresh for real-time updates
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      productsSubscription.unsubscribe();
+    };
   }, []);
 
+  // Extract categories and set price range when products load
   useEffect(() => {
-    filterAndSortProducts();
-  }, [products, searchTerm, categoryFilter, priceRange, showInStock, sortBy]);
-
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, profiles(full_name)')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setProducts(data || []);
-      
-      // Extract unique categories
-      const uniqueCategories = [...new Set(data.map(p => p.category))];
+    if (products.length > 0) {
+      const uniqueCategories = [...new Set(products.map(p => p.category))];
       setCategories(uniqueCategories);
 
-      // Set max price for slider
-      const maxPrice = Math.max(...data.map(p => parseFloat(p.price || 0)));
-      setPriceRange([0, Math.ceil(maxPrice)]);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
+      const maxPrice = Math.max(...products.map(p => parseFloat(p.price || 0)));
+      if (priceRange[1] === 1000) { // Only set once on initial load
+        setPriceRange([0, Math.ceil(maxPrice)]);
+      }
     }
-  };
+  }, [products]);
 
-  const filterAndSortProducts = () => {
+  // Filter and sort products
+  useEffect(() => {
     let filtered = [...products];
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Category filter
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter((product) => product.category === categoryFilter);
-    }
-
-    // Price range filter
-    filtered = filtered.filter((product) => {
-      const price = parseFloat(product.price || 0);
-      return price >= priceRange[0] && price <= priceRange[1];
-    });
 
     // Stock filter
     if (showInStock) {
@@ -98,6 +102,12 @@ const Products = () => {
     }
 
     setFilteredProducts(filtered);
+  }, [products, showInStock, sortBy]);
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    debouncedSearchUpdate(value);
   };
 
   const addToCart = async (productId) => {
@@ -106,38 +116,16 @@ const Products = () => {
       return;
     }
 
-    try {
-      const { data: existingItem } = await supabase
-        .from('cart_items')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('product_id', productId)
-        .maybeSingle();
-
-      if (existingItem) {
-        const { error } = await supabase
-          .from('cart_items')
-          .update({ quantity: existingItem.quantity + 1 })
-          .eq('id', existingItem.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('cart_items')
-          .insert([{ user_id: user.id, product_id: productId, quantity: 1 }]);
-
-        if (error) throw error;
-      }
-
-      alert('Added to cart!');
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      alert('Failed to add to cart');
-    }
+    addToCartMutation.mutate({
+      userId: user.id,
+      productId,
+      quantity: 1,
+    });
   };
 
   const clearFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setCategoryFilter('all');
     setSortBy('newest');
     setShowInStock(false);
@@ -161,7 +149,7 @@ const Products = () => {
     </div>
   );
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen p-4 md:p-8" style={{ background: 'linear-gradient(135deg, #ffe8e8 0%, #fff0f0 50%, #ffe8e8 100%)' }}>
         <div className="max-w-7xl mx-auto">
@@ -169,6 +157,22 @@ const Products = () => {
             {[...Array(8)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen p-4 md:p-8" style={{ background: 'linear-gradient(135deg, #ffe8e8 0%, #fff0f0 50%, #ffe8e8 100%)' }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-16 rounded-2xl shadow-lg" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
+            <div className="text-6xl mb-4">⚠️</div>
+            <h3 className="text-2xl font-bold mb-2" style={{ color: '#b91c1c' }}>
+              Error loading products
+            </h3>
+            <p style={{ color: '#dc2626' }}>{error.message}</p>
           </div>
         </div>
       </div>
@@ -206,7 +210,7 @@ const Products = () => {
                   color: '#b91c1c'
                 }}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={handleSearchChange}
               />
             </div>
 
@@ -294,12 +298,12 @@ const Products = () => {
                 <input
                   type="range"
                   min="0"
-                  max={Math.max(...products.map(p => parseFloat(p.price || 0)))}
+                  max={Math.max(...products.map(p => parseFloat(p.price || 0)), 1000)}
                   value={priceRange[1]}
                   onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
                   className="w-full h-2 rounded-lg appearance-none cursor-pointer"
                   style={{
-                    background: `linear-gradient(to right, #ff5757 0%, #ff8282 ${(priceRange[1] / Math.max(...products.map(p => parseFloat(p.price || 0)))) * 100}%, #fca5a5 ${(priceRange[1] / Math.max(...products.map(p => parseFloat(p.price || 0)))) * 100}%, #fca5a5 100%)`
+                    background: `linear-gradient(to right, #ff5757 0%, #ff8282 ${(priceRange[1] / Math.max(...products.map(p => parseFloat(p.price || 0)), 1000)) * 100}%, #fca5a5 ${(priceRange[1] / Math.max(...products.map(p => parseFloat(p.price || 0)), 1000)) * 100}%, #fca5a5 100%)`
                   }}
                 />
               </div>
@@ -370,7 +374,7 @@ const Products = () => {
             {filteredProducts.map((product) => (
               <div 
                 key={product.id} 
-                onClick={() => setSelectedProduct(product)} // NEW: Click to open modal
+                onClick={() => setSelectedProduct(product)}
                 className="cursor-pointer"
               >
                 <ProductCard
@@ -383,7 +387,7 @@ const Products = () => {
         )}
       </div>
 
-      {/* NEW: Product Detail Modal */}
+      {/* Product Detail Modal */}
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
