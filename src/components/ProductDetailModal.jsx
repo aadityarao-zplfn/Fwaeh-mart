@@ -1,35 +1,48 @@
-import { useState } from 'react';
+import { trackProductView, trackProductClick, trackCartAdd } from '../utils/analytics.jsx';
+import { useState, useEffect } from 'react';
 import { X, Minus, Plus, ShoppingCart, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
-
 
 const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Track product view when modal opens
+  useEffect(() => {
+    if (product?.id) {
+      trackProductView(product.id);
+    }
+  }, [product?.id]);
+
+  // Track product click when modal opens (user clicked to see details)
+  useEffect(() => {
+    if (product?.id) {
+      trackProductClick(product.id);
+    }
+  }, [product?.id]);
+
   const handleAddToCart = async () => {
     if (!product || product.stock_quantity === 0) return;
     
     setIsLoading(true);
     try {
-  const toastId = toast.loading(`Adding ${quantity} item(s) to cart...`);
-  
-  for (let i = 0; i < quantity; i++) {
-    if (onAddToCart) {
-      await onAddToCart(product.id);
+      const toastId = toast.loading(`Adding ${quantity} item(s) to cart...`);
+      
+      // Call onAddToCart once with the quantity instead of looping
+      if (onAddToCart) {
+        await onAddToCart(product.id, quantity); // Pass quantity here
+        trackCartAdd(product.id, quantity); // Track with quantity
+      }
+      
+      toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
+      onClose();
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add to cart');
+    } finally {
+      setIsLoading(false);
     }
-  }
-  
-  toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
-  onClose();
-} catch (error) {
-  console.error('Error adding to cart:', error);
-  toast.error('Failed to add to cart');
-} finally {
-  setIsLoading(false);
-}
-
   };
 
   const incrementQuantity = () => {

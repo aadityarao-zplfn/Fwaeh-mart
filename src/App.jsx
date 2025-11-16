@@ -5,7 +5,7 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import RoleSelection from './pages/Roleselection'; // NEW
+import RoleSelection from './pages/Roleselection';
 import Products from './pages/Products';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -49,7 +49,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/products" element={<Products />} />
 
-            {/* NEW: Role Selection (requires auth but not role) */}
+            {/* Role Selection (requires auth but not role) */}
             <Route
               path="/select-role"
               element={
@@ -97,7 +97,6 @@ function App() {
   );
 }
 
-
-export default App; 
+export default App;
 
 

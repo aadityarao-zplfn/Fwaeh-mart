@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
@@ -8,7 +8,28 @@ export default function RoleSelection() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+
+  // 🆕 CRITICAL FIX: Wait for profile to load and redirect if already has role
+  useEffect(() => {
+    if (!loading && profile?.role) {
+      navigate('/dashboard');
+    }
+  }, [profile, loading, navigate]);
+
+  // 🆕 Show loading while checking auth state
+  if (loading || (user && !profile)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // 🆕 If profile exists and has role, don't render anything (will redirect)
+  if (profile?.role) {
+    return null;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();

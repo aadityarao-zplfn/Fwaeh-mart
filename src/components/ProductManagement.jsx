@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadProductImage } from '../utils/uploadImage';
+import { setStock } from '../utils/inventory';
 import { X, Upload, Plus, Edit, Save, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -10,6 +11,7 @@ const ProductManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [quickEditData, setQuickEditData] = useState({});
@@ -184,44 +186,113 @@ const ProductManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     
     try {
       const toastId = toast.loading(editingProduct ? 'Updating product...' : 'Adding product...');
       
       if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update({
-            ...formData,
-            price: parseFloat(formData.price),
-            stock_quantity: parseInt(formData.stock_quantity)
-          })
-          .eq('id', editingProduct.id);
-
-        if (error) throw error;
+        console.log('🔄 Attempting stock update...');
+        
+        // ✅ FIX: Add timeout to prevent hanging
+        try {
+          const stockPromise = setStock(
+            editingProduct.id, 
+            parseInt(formData.stock_quantity)
+          );
+          
+          // 5-second timeout for Edge Function
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Edge Function timeout after 5 seconds')), 5000)
+          );
+          
+          const stockResult = await Promise.race([stockPromise, timeoutPromise]);
+          
+          if (stockResult.error) {
+            console.log('❌ Edge Function failed, using direct update instead');
+            // Fallback to direct update
+            await updateProductDirectly();
+          } else {
+            console.log('✅ Edge Function success:', stockResult);
+            // Update other fields except stock
+            await updateProductWithoutStock();
+          }
+        } catch (timeoutError) {
+          console.log('⏰ Edge Function timeout, using direct update');
+          await updateProductDirectly();
+        }
+        
         toast.success('Product updated successfully!', { id: toastId });
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert([{
-            ...formData,
-            seller_id: user.id,
-            price: parseFloat(formData.price),
-            stock_quantity: parseInt(formData.stock_quantity)
-          }]);
-
-        if (error) throw error;
+        // New product - direct insert
+        await createNewProduct();
         toast.success('Product added successfully!', { id: toastId });
       }
 
-      setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
-      setShowForm(false);
-      setEditingProduct(null);
-      fetchProducts();
+      // Success handling
+      resetFormAndRefresh();
+      
     } catch (error) {
       console.error('Error saving product:', error);
       toast.error(`Error saving product: ${error.message}`);
+    } finally {
+      setSaving(false);
     }
+  };
+
+  // ✅ Helper functions for better organization
+  const updateProductDirectly = async () => {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        stock_quantity: parseInt(formData.stock_quantity),
+        category: formData.category,
+        image_url: formData.image_url,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', editingProduct.id);
+
+    if (error) throw error;
+  };
+
+  const updateProductWithoutStock = async () => {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        category: formData.category,
+        image_url: formData.image_url,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', editingProduct.id);
+
+    if (error) throw error;
+  };
+
+  const createNewProduct = async () => {
+    const { error } = await supabase
+      .from('products')
+      .insert([{
+        ...formData,
+        seller_id: user.id,
+        price: parseFloat(formData.price),
+        stock_quantity: parseInt(formData.stock_quantity),
+        created_at: new Date().toISOString()
+      }]);
+
+    if (error) throw error;
+  };
+
+  const resetFormAndRefresh = () => {
+    setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
+    setShowForm(false);
+    setEditingProduct(null);
+    fetchProducts();
   };
 
   const handleEdit = (product) => {
@@ -238,6 +309,8 @@ const ProductManagement = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this product?')) return;
+
     try {
       const toastId = toast.loading('Deleting product...');
       const { error } = await supabase
@@ -343,7 +416,6 @@ const ProductManagement = () => {
                   Product Image
                 </label>
                 
-                {/* Image Preview */}
                 <div className="mb-4">
                   <div className="w-48 h-48 border-2 border-dashed border-red-300 rounded-xl overflow-hidden bg-red-50 flex items-center justify-center mx-auto">
                     {formData.image_url ? (
@@ -361,7 +433,6 @@ const ProductManagement = () => {
                   </div>
                 </div>
 
-                {/* Upload Button */}
                 <label className="cursor-pointer block">
                   <input
                     type="file"
@@ -377,9 +448,16 @@ const ProductManagement = () => {
                 <p className="text-xs text-red-600 mt-2 text-center">
                   PNG, JPG, WebP up to 5MB
                 </p>
+                
+                {formData.image_url && (
+                  <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
+                    <p className="text-xs text-green-700 text-center">
+                      ✅ Image uploaded successfully!
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Product Name - REQUIRED */}
               <div>
                 <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
                   Product Name <span className="text-red-500">*</span>
@@ -395,7 +473,6 @@ const ProductManagement = () => {
                 />
               </div>
 
-              {/* Description - OPTIONAL */}
               <div>
                 <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
                   Description
@@ -411,7 +488,6 @@ const ProductManagement = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Price - REQUIRED */}
                 <div>
                   <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
                     Price ($) <span className="text-red-500">*</span>
@@ -429,7 +505,6 @@ const ProductManagement = () => {
                   />
                 </div>
 
-                {/* Stock - REQUIRED */}
                 <div>
                   <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
                     Stock <span className="text-red-500">*</span>
@@ -447,7 +522,6 @@ const ProductManagement = () => {
                 </div>
               </div>
 
-              {/* Category - OPTIONAL */}
               <div>
                 <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
                   Category
@@ -462,25 +536,31 @@ const ProductManagement = () => {
                 />
               </div>
 
-              {/* Required Fields Note */}
               <div className="pt-2">
                 <p className="text-xs text-red-600">
                   <span className="text-red-500">*</span> Required fields
                 </p>
+                {editingProduct && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    🔄 Will try Edge Function first (5s timeout), then fallback to direct update
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all"
+                  disabled={saving}
+                  className="flex-1 py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
                 >
-                  {editingProduct ? 'Update Product' : 'Add Product'}
+                  {saving ? 'Saving...' : editingProduct ? 'Update Product' : 'Add Product'}
                 </button>
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-6 py-3 rounded-xl font-bold transition-all"
+                  disabled={saving}
+                  className="px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50"
                   style={{ background: '#fff5f5', color: '#b91c1c', border: '2px solid #fca5a5' }}
                 >
                   Cancel
@@ -632,8 +712,7 @@ const ProductManagement = () => {
                       <button
                         onClick={() => startQuickEdit(product)}
                         className="flex items-center justify-center flex-1 py-2 rounded-lg text-sm text-white transition-all"
-style={{ background: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' }}
-
+                        style={{ background: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' }}
                       >
                         <Edit size={14} className="mr-1" />
                         Quick Edit

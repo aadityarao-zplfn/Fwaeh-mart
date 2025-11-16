@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({});
@@ -15,9 +15,10 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const fetchingProfile = useRef(false); // Prevent duplicate fetches
 
   useEffect(() => {
-    // ✅ FIX: Better session initialization
+    // Initialize auth
     const initAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -29,7 +30,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         setUser(session?.user ?? null);
-        if (session?.user) {
+        if (session?.user && !fetchingProfile.current) {
           await fetchProfile(session.user.id);
         } else {
           setLoading(false);
@@ -42,14 +43,14 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
 
-    // ✅ FIX: Better auth state change handling
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event); // Debug logging
+        console.log('Auth event:', event);
         
         setUser(session?.user ?? null);
         
-        if (session?.user) {
+        if (session?.user && !fetchingProfile.current) {
           await fetchProfile(session.user.id);
         } else {
           setProfile(null);
@@ -59,28 +60,44 @@ export const AuthProvider = ({ children }) => {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // Empty dependency array - only run once!
 
   const fetchProfile = async (userId) => {
+    if (fetchingProfile.current) {
+      console.log('⏭️ Skipping duplicate fetch');
+      return;
+    }
+    
+    fetchingProfile.current = true;
+    console.log('🔄 Fetching profile for:', userId);
+    
     try {
-      const { data, error } = await supabase
+      // ADD TIMEOUT
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+      
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        throw error;
-      }
+  
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+  
+      console.log('📦 Profile data:', data, 'Error:', error);
+  
+      if (error) throw error;
       
       setProfile(data);
+      console.log('✅ Profile set successfully');
     } catch (error) {
-      console.error('Error in fetchProfile:', error);
-      // ✅ Don't block the app if profile fetch fails
+      console.error('❌ Error in fetchProfile:', error);
       setProfile(null);
     } finally {
       setLoading(false);
+      fetchingProfile.current = false;
+      console.log('🏁 Fetch complete');
     }
   };
 
@@ -127,13 +144,11 @@ export const AuthProvider = ({ children }) => {
 
       if (error) throw error;
 
-      // ✅ FIX: Better email verification check
       if (data.user && !data.user.email_confirmed_at) {
-        // Sign out if not verified
         await supabase.auth.signOut();
         return { 
           data: null, 
-          error: { message: 'Please verify your email before signing in. Check your inbox for the confirmation link.' }
+          error: { message: 'Please verify your email before signing in.' }
         };
       }
 
@@ -166,14 +181,13 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      // ✅ FIX: Clear all auth data properly
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
       setUser(null);
       setProfile(null);
+      fetchingProfile.current = false;
       
-      // ✅ Clear any cached data
       window.localStorage.removeItem('fwaeh-mart-auth');
       
     } catch (error) {
