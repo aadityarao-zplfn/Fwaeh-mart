@@ -11,35 +11,45 @@ const CustomerDashboard = () => {
     fetchOrders();
   }, [user]);
 
-  const fetchOrders = async () => {
-    try {
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+const fetchOrders = async () => {
+  try {
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-      if (ordersError) throw ordersError;
+    if (ordersError) throw ordersError;
 
-      const ordersWithItems = await Promise.all(
-        ordersData.map(async (order) => {
-          const { data: items } = await supabase
-            .from('order_items')
-            .select('*, products(name, image_url)')
-            .eq('order_id', order.id);
+    const ordersWithItems = await Promise.all(
+      ordersData.map(async (order) => {
+        const { data: items, error: itemsError } = await supabase
+          .from('order_items')
+          .select(`
+            *,
+            products (
+              name,
+              image_url
+            )
+          `)
+          .eq('order_id', order.id);
 
-          return { ...order, items };
-        })
-      );
+        if (itemsError) {
+          console.error('Error fetching order items:', itemsError);
+          return { ...order, items: [] };
+        }
 
-      setOrders(ordersWithItems);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        return { ...order, items: items || [] };
+      })
+    );
 
+    setOrders(ordersWithItems);
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+  } finally {
+    setLoading(false);
+  }
+};
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">

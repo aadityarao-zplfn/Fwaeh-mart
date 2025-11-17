@@ -10,6 +10,7 @@ import Products from './pages/Products';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Dashboard from './pages/Dashboard';
+import OrderTracking from './pages/OrderTracking';
 import CustomerDashboardLayout from './components/dashboards/CustomerDashboardLayout';
 
 function App() {
@@ -80,6 +81,18 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            
+            {/* Order Tracking Route */}
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <OrderTracking />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
 
             {/* Dashboard - Role-based rendering inside */}
             <Route
@@ -98,5 +111,3 @@ function App() {
 }
 
 export default App;
-
-
