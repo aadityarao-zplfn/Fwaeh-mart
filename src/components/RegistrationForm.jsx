@@ -142,55 +142,76 @@ export default function RegistrationForm() {
     }
   };
 
-  // 🆕 CORRECT OTP VERIFICATION HANDLER
-const handleOTPVerify = async (otpCode) => {
-  try {
-    console.log('🔄 Verifying OTP:', otpCode, 'for email:', pendingEmail);
-    
-    if (!pendingEmail) {
-      throw new Error('Email not found for OTP verification');
+  const handleOTPVerify = async (otpCode) => {
+    try {
+      console.log('🔄 Verifying OTP:', otpCode, 'for email:', pendingEmail);
+      
+      if (!pendingEmail) {
+        throw new Error('Email not found for OTP verification');
+      }
+
+      // 1. Verify the OTP
+      const verificationResult = await verifyCustomOTP(pendingEmail, otpCode, pendingUserId);
+      
+      if (!verificationResult.valid) {
+        throw new Error(verificationResult.error || 'Invalid OTP');
+      }
+
+      console.log('✅ OTP verified successfully!');
+
+      // 2. Retrieve user details from storage
+      const storedData = sessionStorage.getItem('pendingRegistration');
+      if (!storedData) {
+        throw new Error('Registration data lost. Please try signing up again.');
+      }
+      const userData = JSON.parse(storedData);
+
+      // 3. CREATE OR UPDATE THE USER PROFILE (Upsert fixes the 409 Conflict)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: pendingUserId,
+            email: userData.email,
+            full_name: userData.fullName,
+            role: userData.role,
+            phone: userData.phone || null,
+            address: userData.location || null
+          },
+          // CRITICAL: onConflict tells Supabase to handle the duplicate ID silently
+          { onConflict: 'id', ignoreDuplicates: false }
+        );
+
+      if (profileError) {
+        console.error('Profile creation/update error:', profileError);
+        throw new Error('Failed to create user profile');
+      }
+
+      // 4. Update Email Confirmation Status (Optional based on Supabase settings)
+      // This is safe to keep now that the profile is created/updated
+      await supabase.auth.updateUser({
+        data: { email_confirmed_at: new Date().toISOString() }
+      });
+
+      setShowOTPModal(false);
+      toast.success('Account created successfully! Welcome to Fwaeh Mart! 🎉');
+      
+      // Clean up
+      sessionStorage.removeItem('pendingRegistration');
+      setPendingUserId(null);
+      setPendingEmail(null);
+      
+      // Redirect to Login
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      toast.error(error.message || 'OTP verification failed. Please try again.');
+      throw error; 
     }
-
-    // 🆕 ACTUALLY VERIFY THE OTP
-    const verificationResult = await verifyCustomOTP(pendingEmail, otpCode, pendingUserId);
-    
-    if (!verificationResult.valid) {
-      throw new Error(verificationResult.error || 'Invalid OTP');
-    }
-
-    console.log('✅ OTP verified successfully!');
-    
-    // 🆕 MARK USER AS CONFIRMED IN SUPABASE
-    const { error: updateError } = await supabase.auth.updateUser({
-      data: { email_confirmed_at: new Date().toISOString() }
-    });
-
-    if (updateError) {
-      console.error('Error updating user confirmation:', updateError);
-      // Continue anyway - the main verification is done via our OTP system
-    }
-
-    setShowOTPModal(false);
-    
-    // Show success message
-    toast.success('Account created successfully! Welcome to Fwaeh Mart! 🎉');
-    
-    // Clear pending data
-    sessionStorage.removeItem('pendingRegistration');
-    setPendingUserId(null);
-    setPendingEmail(null);
-    
-    // Redirect to login (user needs to sign in)
-    setTimeout(() => {
-      navigate('/login');
-    }, 2000);
-    
-  } catch (error) {
-    console.error('OTP verification error:', error);
-    toast.error(error.message || 'OTP verification failed. Please try again.');
-    throw error; // 🆕 Re-throw to let OTPModal handle retry
-  }
- };
+  };
 
   const handleGoogleSignUp = async () => {
     try {
