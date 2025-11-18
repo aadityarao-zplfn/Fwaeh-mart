@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
+import NearbyShopsMap from '../components/NearbyShopsMap';
 import { Search, SlidersHorizontal, X, ChevronDown, ChevronUp, Star, MapPin, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -19,6 +20,8 @@ const Products = () => {
   const [minRating, setMinRating] = useState(0);
   const [maxDistance, setMaxDistance] = useState(50);
   const [sellerType, setSellerType] = useState('all');
+  const [userLocation, setUserLocation] = useState(null);
+  const [showMap, setShowMap] = useState(false);
   const { user } = useAuth();
 
   // Collapsible sections
@@ -36,11 +39,33 @@ const Products = () => {
     fetchProducts();
   }, []);
 
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log('Location access denied:', error);
+          // Fallback to Secunderabad
+          setUserLocation({
+            lat: 17.385,
+            lng: 78.486
+          });
+        }
+      );
+    }
+  }, []);
+
   const fetchProducts = async () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*, profiles(full_name, role)')
+        .select('*, profiles(full_name, role, location_lat, location_lng, location_address)')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -310,6 +335,16 @@ const Products = () => {
               />
             </div>
 
+            {/* Map View Toggle Button */}
+            <button
+              onClick={() => setShowMap(!showMap)}
+              className="flex items-center justify-center px-6 py-3 rounded-xl font-bold text-white transition-all shadow-md hover:shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
+            >
+              <MapPin size={20} className="mr-2" />
+              {showMap ? 'List View' : 'Map View'}
+            </button>
+
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -539,6 +574,16 @@ const Products = () => {
             </div>
           )}
         </div>
+
+        {/* Map View */}
+        {showMap && (
+          <div className="mb-6">
+            <NearbyShopsMap 
+              products={filteredProducts.filter(p => p.profiles?.location_lat)} 
+              userLocation={userLocation}
+            />
+          </div>
+        )}
 
         {/* Results Count */}
         <div className="mb-6">
