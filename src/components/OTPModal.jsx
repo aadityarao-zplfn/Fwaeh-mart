@@ -1,58 +1,89 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect } from "react";
+import { supabase } from '../lib/supabase';
+import { verifyCustomOTP, generateAndSendOTP } from '../utils/otpService';
+import toast from 'react-hot-toast';
 
-export default function OTPModal({ onVerify, email }) {
-  const [otp, setOtp] = useState(["", "", "", "", "", ""])
-  const [timeLeft, setTimeLeft] = useState(60)
-  const [canResend, setCanResend] = useState(false)
-  const [isVerifying, setIsVerifying] = useState(false)
+export default function OTPModal({ onVerify, email, userId, onClose }) {
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // Countdown timer
   useEffect(() => {
     if (timeLeft <= 0) {
-      setCanResend(true)
-      return
+      setCanResend(true);
+      return;
     }
 
-    const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [timeLeft])
+    const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft]);
 
   const handleInputChange = (index, value) => {
-    if (!/^\d*$/.test(value)) return
+    if (!/^\d*$/.test(value)) return;
 
-    const newOtp = [...otp]
-    newOtp[index] = value.slice(-1)
-    setOtp(newOtp)
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
 
     // Auto-focus to next input
     if (value && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`)
-      nextInput?.focus()
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
     }
-  }
+  };
 
   const handleKeyDown = (index, e) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`)
-      prevInput?.focus()
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
     }
-  }
+  };
 
-  const handleVerify = () => {
-    setIsVerifying(true)
-    const otpCode = otp.join("")
-    setTimeout(() => {
-      onVerify(otpCode)
-      setIsVerifying(false)
-    }, 1000)
-  }
+  // 🆕 REAL OTP VERIFICATION WITH DATABASE
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    const otpCode = otp.join("");
+    
+    try {
+      console.log('🔐 Sending OTP to parent for verification:', otpCode);
+      await onVerify(otpCode); // Just pass to parent, don't verify here
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      toast.error(error.message || 'OTP verification failed. Please try again.');
+      throw error;
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
-  const handleResend = () => {
-    setTimeLeft(60)
-    setCanResend(false)
-    setOtp(["", "", "", "", "", ""])
-    console.log("OTP resent to", email)
-  }
+  // 🆕 REAL OTP RESEND WITH DATABASE
+  const handleResend = async () => {
+    try {
+      console.log('🔄 Resending OTP to:', email, 'for user:', userId);
+      
+      const result = await generateAndSendOTP(email, userId);
+      
+      if (!result.success) {
+        toast.error('Failed to resend OTP: ' + result.error);
+        return;
+      }
+
+      toast.success(`New OTP sent! Check console for code.`);
+      setTimeLeft(60);
+      setCanResend(false);
+      setOtp(["", "", "", "", "", ""]);
+      
+      // Focus first input
+      const firstInput = document.getElementById('otp-0');
+      firstInput?.focus();
+      
+    } catch (error) {
+      console.error('Resend error:', error);
+      toast.error('Failed to resend OTP');
+    }
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{
@@ -79,11 +110,21 @@ export default function OTPModal({ onVerify, email }) {
               Verify Your Code
             </h1>
             <p className="text-base" style={{ color: '#dc2626' }}>
-              We sent a 6-digit code to
+              Enter the 6-digit code for
             </p>
             <p className="text-sm font-semibold mt-1" style={{ color: '#ff5757' }}>
               {email}
             </p>
+            
+            {/* 🆕 DEVELOPMENT HELPER */}
+            <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200">
+              <p className="text-xs text-green-800 font-medium">
+                ✅ <strong>Instant OTP Delivery:</strong> Check browser console for code
+              </p>
+              <p className="text-xs text-green-800 mt-1">
+                User ID: {userId?.slice(0, 8)}...
+              </p>
+            </div>
           </div>
 
           <div className="mb-8">
@@ -119,7 +160,7 @@ export default function OTPModal({ onVerify, email }) {
               color: '#ffffff'
             }}
           >
-            {isVerifying ? "Verifying..." : "Verify Code"}
+            {isVerifying ? "Verifying..." : "Verify & Create Account"}
           </button>
 
           <div className="relative my-6">
@@ -131,7 +172,7 @@ export default function OTPModal({ onVerify, email }) {
                 background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)',
                 color: '#dc2626'
               }}>
-                Didn't receive the code?
+                Need a new code?
               </span>
             </div>
           </div>
@@ -143,7 +184,7 @@ export default function OTPModal({ onVerify, email }) {
                 className="text-base font-bold transition-colors hover:opacity-80"
                 style={{ color: '#ff5757' }}
               >
-                Resend Code
+                Resend New Code
               </button>
             ) : (
               <p className="text-base font-semibold" style={{ color: '#dc2626' }}>
@@ -154,5 +195,5 @@ export default function OTPModal({ onVerify, email }) {
         </div>
       </div>
     </div>
-  )
+  );
 }

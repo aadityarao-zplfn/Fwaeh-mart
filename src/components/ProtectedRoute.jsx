@@ -5,8 +5,8 @@ const ProtectedRoute = ({ children, allowedRoles = [], requireRole = true }) => 
   const { user, profile, loading } = useAuth();
   const location = useLocation();
 
-  // 🆕 CRITICAL FIX: Show loading until we have both user AND profile state
-  if (loading || (user && !profile)) {
+  // Show loading while checking auth state
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -19,14 +19,15 @@ const ProtectedRoute = ({ children, allowedRoles = [], requireRole = true }) => 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // 🆕 REMOVED OTP CHECK - Login.jsx already handles this
+
   // If requireRole is false, allow access (for role selection page)
   if (!requireRole) {
     return children;
   }
 
-  // 🆕 FIX: Only redirect to role selection if profile exists but has no role
-  // This prevents redirecting while profile is still loading
-  if (profile && !profile.role) {
+  // Check if user has a role assigned
+  if (!profile?.role) {
     return <Navigate to="/select-role" replace />;
   }
 

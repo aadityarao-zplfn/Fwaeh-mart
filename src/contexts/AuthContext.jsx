@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { isUserOTPVerified } from '../utils/otpService'; // 🆕 ADD THIS IMPORT
 
 const AuthContext = createContext({});
 
@@ -101,40 +102,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signUp = async (email, password, fullName, role) => {
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role,
-          },
-          emailRedirectTo: `${window.location.origin}/login`,
-        },
-      });
-
-      if (authError) throw authError;
-
-      if (authData.user && !authData.session) {
-        return { 
-          data: authData, 
-          error: null,
-          needsEmailConfirmation: true 
-        };
-      }
-
-      if (authData.user) {
-        await fetchProfile(authData.user.id);
-      }
-
-      return { data: authData, error: null, needsEmailConfirmation: false };
-    } catch (error) {
-      return { data: null, error, needsEmailConfirmation: false };
-    }
-  };
-
   const signIn = async (email, password) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -144,15 +111,12 @@ export const AuthProvider = ({ children }) => {
 
       if (error) throw error;
 
-      if (data.user && !data.user.email_confirmed_at) {
-        await supabase.auth.signOut();
-        return { 
-          data: null, 
-          error: { message: 'Please verify your email before signing in.' }
-        };
-      }
-
+      // 🆕 ADD OTP VERIFICATION CHECK (SAME AS Login.jsx)
       if (data.user) {
+        const isVerified = await isUserOTPVerified(data.user.id);
+        if (!isVerified) {
+          throw new Error('Please complete OTP verification before signing in. Check your email for the verification code.');
+        }
         await fetchProfile(data.user.id);
       }
 
@@ -199,7 +163,6 @@ export const AuthProvider = ({ children }) => {
     user,
     profile,
     loading,
-    signUp,
     signIn,
     signOut,
     resendConfirmationEmail,

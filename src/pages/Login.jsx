@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { isUserOTPVerified } from "../utils/otpService"; // 🆕 ADD THIS IMPORT
 import { LoadingSpinner, LoadingButton } from "../components/ui/LoadingSpinner";
 
 export default function LoginForm() {
@@ -50,10 +51,14 @@ export default function LoginForm() {
         return;
       }
 
-      if (data.user && !data.user.email_confirmed_at) {
-        setError('Please verify your email before signing in. Check your inbox for the confirmation link.');
-        setIsLoading(false);
-        return;
+      // 🆕 CHECK OUR OTP VERIFICATION INSTEAD OF SUPABASE EMAIL CONFIRMATION
+      if (data.user) {
+        const isVerified = await isUserOTPVerified(data.user.id);
+        if (!isVerified) {
+          setError('Please complete OTP verification before signing in. Check your email for the verification code.');
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Success!
