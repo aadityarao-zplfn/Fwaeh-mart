@@ -154,7 +154,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                 {product.name}
               </h1>
               <p className="text-4xl font-bold" style={{ color: '#ff5757' }}>
-                ${parseFloat(product.price || 0).toFixed(2)}
+                ₹{parseFloat(product.price || 0).toFixed(2)}
               </p>
             </div>
 
@@ -212,7 +212,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                 </div>
                 <p className="text-sm mt-3 font-medium" style={{ color: '#dc2626' }}>
                   Total: <span className="text-xl font-bold" style={{ color: '#ff5757' }}>
-                    ${(parseFloat(product.price || 0) * quantity).toFixed(2)}
+                    ₹{(parseFloat(product.price || 0) * quantity).toFixed(2)}
                   </span>
                 </p>
               </div>

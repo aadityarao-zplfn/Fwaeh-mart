@@ -116,7 +116,7 @@ const SellerDashboard = () => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm opacity-90 font-medium">Total Sales</p>
-                  <p className="text-4xl font-bold mt-2">${stats.totalSales.toFixed(2)}</p>
+                  <p className="text-4xl font-bold mt-2">₹{stats.totalSales.toFixed(2)}</p>
                 </div>
                 <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,7 +177,7 @@ const SellerDashboard = () => {
                 <div>
                   <p className="text-sm opacity-90 font-medium">Avg. Order Value</p>
                   <p className="text-4xl font-bold mt-2">
-                    ${stats.totalOrders > 0 ? (stats.totalSales / stats.totalOrders).toFixed(2) : '0.00'}
+                    ₹{stats.totalOrders > 0 ? (stats.totalSales / stats.totalOrders).toFixed(2) : '0.00'}
                   </p>
                 </div>
                 <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
@@ -282,7 +282,7 @@ const SellerDashboard = () => {
                             className="text-sm font-semibold"
                             style={{ color: '#ff5757' }}
                           >
-                            ${(parseFloat(item.price_at_purchase) * item.quantity).toFixed(2)}
+                            ₹{(parseFloat(item.price_at_purchase) * item.quantity).toFixed(2)}
                           </p>
                         </div>
                       ))}

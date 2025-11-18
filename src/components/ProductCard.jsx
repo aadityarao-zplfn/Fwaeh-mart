@@ -69,7 +69,7 @@ const ProductCard = ({ product, onAddToCart }) => {
           <div>
             <p className="text-xs text-gray-500 mb-1">Price</p>
             <span className="text-3xl font-bold" style={{ color: '#E88B8B' }}>
-              ${Number.parseFloat(product.price).toFixed(2)}
+              ₹{Number.parseFloat(product.price).toFixed(2)}
             </span>
             <p className="text-xs text-gray-500 mt-1 flex items-center">
               <span

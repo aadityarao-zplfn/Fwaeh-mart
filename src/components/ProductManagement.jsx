@@ -490,7 +490,7 @@ const ProductManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
-                    Price ($) <span className="text-red-500">*</span>
+                    Price (₹) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -665,7 +665,7 @@ const ProductManagement = () => {
                     <h3 className="text-lg font-bold mb-2" style={{ color: '#b91c1c' }}>{product.name}</h3>
                     <p className="text-sm mb-3 line-clamp-2" style={{ color: '#dc2626' }}>{product.description}</p>
                     <div className="flex justify-between items-center mb-4">
-                      <span className="text-2xl font-bold" style={{ color: '#ff5757' }}>${product.price}</span>
+                      <span className="text-2xl font-bold" style={{ color: '#ff5757' }}>₹{product.price}</span>
                       <span className="text-sm" style={{ color: '#dc2626' }}>Stock: {product.stock_quantity}</span>
                     </div>
                   </>
