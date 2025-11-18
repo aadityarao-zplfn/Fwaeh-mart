@@ -69,14 +69,19 @@ const Navbar = () => {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link 
-            to="/" 
-            className="text-2xl font-bold transition-all hover:opacity-80"
-            style={{ color: '#b91c1c' }}
-          >
-            Fwaeh Mart
-          </Link>
+     {/* Logo */}
+<Link 
+  to="/" 
+  className="flex items-center text-2xl font-bold transition-all hover:opacity-80"
+  style={{ color: '#b91c1c' }}
+>
+  {/* <img 
+    src="https://i.ibb.co/fYvF8s8V/Whats-App-Image-2025-11-18-at-22-03-30-942d91e3-removebg-preview.png" 
+    alt="Fwaeh Mart Logo" 
+    className="h-40 w-20 -mr-2 -mt-3 object-contain"
+  /> */}
+  Fwaeh Mart
+</Link>
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-6">

@@ -125,88 +125,30 @@ const Checkout = () => {
     }));
   };
 
-  const handlePlaceOrder = async () => {
-    setPlacing(true);
-    const toastId = toast.loading('Placing your order...');
+const handlePlaceOrder = async () => {
+  if (!shippingInfo.address.trim()) {
+    toast.error('Please enter a shipping address');
+    return;
+  }
 
-    try {
-      // Create full address string
-      const fullAddress = `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`;
-      const { total } = calculateOrderSummary();
-
-      // Create order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([
-          {
-            user_id: user.id,
-            total_amount: total,
-            shipping_address: fullAddress,
-            status: 'pending',
-            payment_method: paymentMethod,
-            contact_phone: shippingInfo.phone,
-            contact_email: shippingInfo.email,
-            contact_name: shippingInfo.fullName,
-          },
-        ])
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Create order items
-      const orderItems = cartItems.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        seller_id: item.products.seller_id,
-        quantity: item.quantity,
-        price_at_purchase: item.products.price,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Update stock quantities
-      for (const item of cartItems) {
-        const newStock = item.products.stock_quantity - item.quantity;
-        await supabase
-          .from('products')
-          .update({ stock_quantity: newStock })
-          .eq('id', item.product_id);
-      }
-
-      // Clear cart
-      const { error: clearCartError } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (clearCartError) throw clearCartError;
-
-      // Save address to profile if requested
-      if (shippingInfo.saveAddress) {
-        await supabase
-          .from('profiles')
-          .update({
-            address: fullAddress,
-            phone: shippingInfo.phone,
-            full_name: shippingInfo.fullName
-          })
-          .eq('id', user.id);
-      }
-
-      toast.success('Order placed successfully!', { id: toastId });
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error placing order:', error);
-      toast.error('Failed to place order. Please try again.', { id: toastId });
-    } finally {
-      setPlacing(false);
-    }
+  const orderDetails = {
+    subtotal: calculateTotal(),
+    shipping: calculateOrderSummary().shipping,
+    tax: calculateTotal() * 0.1, // 10% tax
+    total: calculateTotal() * 1.1
   };
+
+  // Navigate to payment page instead of placing order directly
+  navigate('/payment', { 
+    state: { 
+      orderDetails,
+      cartItems,
+      shippingAddress: `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`,
+      shippingInfo,
+      paymentMethod
+    } 
+  });
+};
 
   if (loading) {
     return (

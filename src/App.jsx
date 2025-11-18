@@ -12,6 +12,12 @@ import Checkout from './pages/Checkout';
 import Dashboard from './pages/Dashboard';
 import OrderTracking from './pages/OrderTracking';
 import CustomerDashboardLayout from './components/dashboards/CustomerDashboardLayout';
+import Payment from './pages/Payment';
+import PaymentSuccess from './pages/PaymentSuccess'; // adjust path as needed
+import PaymentFailure from './pages/PaymentFailure'; // adjust path as needed
+import PaymentHistory from './pages/PaymentHistory'; // adjust path as needed
+import Profile from './pages/Profile';
+
 
 function App() {
   return (
@@ -81,6 +87,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/profile" element={<Profile />} />
+
             
             {/* Order Tracking Route */}
             <Route
@@ -93,6 +101,20 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            
+            {/* Payment Route - Added CustomerDashboardLayout */}
+            <Route
+              path="/payment"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <Payment />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/payment-failure" element={<PaymentFailure />} />
 
             {/* Dashboard - Role-based rendering inside */}
             <Route
@@ -103,6 +125,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+  path="/payment-history"
+  element={
+    <ProtectedRoute allowedRoles={['customer']}>
+      <CustomerDashboardLayout>
+        <PaymentHistory />
+      </CustomerDashboardLayout>
+    </ProtectedRoute>
+  }
+/>
           </Routes>
         </BrowserRouter>
       </AuthProvider>

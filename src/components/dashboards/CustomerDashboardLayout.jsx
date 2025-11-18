@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, ShoppingCart, Package, User, Heart, Menu, X } from 'lucide-react';
+import { Home, ShoppingBag, ShoppingCart, Package, User, CreditCard, Heart, Menu, X } from 'lucide-react';
 
 const CustomerDashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  const navItems = [
+const navItems = [
     { path: '/dashboard', label: 'Home', icon: Home },
     { path: '/products', label: 'Browse Products', icon: ShoppingBag },
     { path: '/cart', label: 'My Cart', icon: ShoppingCart },
     { path: '/orders', label: 'My Orders', icon: Package },
-    { path: '/wishlist', label: 'Wishlist', icon: Heart },
+  //  { path: '/wishlist', label: 'Wishlist', icon: Heart },
+    { path: '/payment-history', label: 'Payment History', icon: CreditCard }, 
     { path: '/profile', label: 'Profile', icon: User },
-  ];
+];
 
   const isActive = (path) => location.pathname === path;
 
