@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import toast from 'react-hot-toast';
 import { supabase } from "../lib/supabase";
-import { generateAndSendOTP, verifyCustomOTP } from "../utils/otpService"; // 🆕 ADD verifyCustomOTP
+import { generateAndSendOTP, verifyCustomOTP } from "../utils/otpService";
 import OTPModal from "./OTPModal";
 import { LoadingSpinner, LoadingButton } from "../components/ui/LoadingSpinner";
 
@@ -28,17 +28,46 @@ export default function RegistrationForm() {
   const [error, setError] = useState("");
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [pendingUserId, setPendingUserId] = useState(null);
-  const [pendingEmail, setPendingEmail] = useState(null); // 🆕 Store email for OTP verification
+  const [pendingEmail, setPendingEmail] = useState(null);
 
   const navigate = useNavigate();
   const { signUp } = useAuth();
 
-  // Unified handleChange for all fields
+  // Unified handleChange with field-specific validation
   const handleChange = (e) => {
     const { name, value } = e.target;
+    let sanitizedValue = value;
+
+    // Field-specific input restrictions
+    switch (name) {
+      case 'fullName':
+        // Only letters, spaces, hyphens, and apostrophes
+        sanitizedValue = value.replace(/[^a-zA-Z\s\-']/g, '');
+        break;
+      
+      case 'phone':
+        // Only numbers, spaces, parentheses, hyphens, and plus sign
+        sanitizedValue = value.replace(/[^0-9\s()\-+]/g, '');
+        break;
+      
+      case 'email':
+        // Remove spaces from email
+        sanitizedValue = value.replace(/\s/g, '');
+        break;
+      
+      case 'password':
+      case 'confirmPassword':
+        // Remove spaces from passwords
+        sanitizedValue = value.replace(/\s/g, '');
+        break;
+      
+      default:
+        sanitizedValue = value;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: sanitizedValue
     }));
   };
 
@@ -53,23 +82,48 @@ export default function RegistrationForm() {
       return;
     }
 
-    // Validation: Name at least 3 characters
-    if (formData.fullName.trim().length < 3) {
-      setError("Name must be at least 3 characters long.");
+    // Validation: Name (only letters, spaces, hyphens, apostrophes, min 3 chars)
+    const nameRegex = /^[a-zA-Z\s\-']{3,}$/;
+    if (!nameRegex.test(formData.fullName.trim())) {
+      setError("Name must be at least 3 characters and contain only letters, spaces, hyphens, or apostrophes.");
       return;
     }
 
-    // Validation: Email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Validation: Email format (strict)
+    const emailRegex = /^[a-zA-Z0-9][a-zA-Z0-9._-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(formData.email)) {
       setError("Please enter a valid email address.");
       return;
     }
 
+    // Validation: Phone number format (if provided)
+    if (formData.phone && formData.phone.trim()) {
+      // Accepts formats like: +1234567890, (123) 456-7890, 123-456-7890, etc.
+      // Must have at least 10 digits
+      const phoneDigits = formData.phone.replace(/\D/g, '');
+      if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+        setError("Phone number must contain between 10 and 15 digits.");
+        return;
+      }
+      
+      // Optional: Check for valid phone format patterns
+      const phoneRegex = /^[\d\s()\-+]{10,20}$/;
+      if (!phoneRegex.test(formData.phone)) {
+        setError("Please enter a valid phone number format.");
+        return;
+      }
+    }
+
     // Validation: Password strength (min 8 chars, 1 uppercase, 1 lowercase, 1 number)
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&#^()_+=\-[\]{}|\\:;"'<>,.~/`]{8,}$/;
     if (!passwordRegex.test(formData.password)) {
-      setError("Password must be at least 8 characters, with an uppercase letter, lowercase letter, and a number.");
+      setError("Password must be at least 8 characters with an uppercase letter, lowercase letter, and a number.");
+      return;
+    }
+
+    // Validation: No spaces in password
+    if (/\s/.test(formData.password)) {
+      setError("Password cannot contain spaces.");
       return;
     }
 
@@ -88,13 +142,13 @@ export default function RegistrationForm() {
     setIsLoading(true);
 
     try {
-      // 🆕 FIRST create Supabase user
+      // Create Supabase user
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName,
+            full_name: formData.fullName.trim(),
             role: formData.role,
           }
         }
@@ -108,8 +162,8 @@ export default function RegistrationForm() {
 
       console.log('✅ User created in Supabase:', authData.user.id);
 
-      // 🆕 Generate OTP with userId
-      const otpResult = await generateAndSendOTP(formData.email, authData.user.id);
+      // Generate OTP with userId
+      const otpResult = await generateAndSendOTP(formData.email.trim().toLowerCase(), authData.user.id);
       
       if (!otpResult.success) {
         setError('Failed to generate OTP: ' + otpResult.error);
@@ -117,22 +171,22 @@ export default function RegistrationForm() {
         return;
       }
 
-      // 🆕 Store user ID AND EMAIL for OTP verification
+      // Store user ID AND EMAIL for OTP verification
       setPendingUserId(authData.user.id);
-      setPendingEmail(formData.email); // 🆕 CRITICAL: Store email for verification
+      setPendingEmail(formData.email.trim().toLowerCase());
       
-      // 🆕 Store registration data temporarily
+      // Store registration data temporarily
       sessionStorage.setItem('pendingRegistration', JSON.stringify({
         userId: authData.user.id,
-        email: formData.email,
-        fullName: formData.fullName,
+        email: formData.email.trim().toLowerCase(),
+        fullName: formData.fullName.trim(),
         role: formData.role,
-        phone: formData.phone,
-        location: formData.location
+        phone: formData.phone.trim() || null,
+        location: formData.location.trim() || null
       }));
 
       setShowOTPModal(true);
-      toast.success('OTP sent to your email! Please check your inbox.'); // 🆕 Updated message
+      toast.success('OTP sent to your email! Please check your inbox.');
       
     } catch (err) {
       console.error('Registration error:', err);
@@ -166,7 +220,7 @@ export default function RegistrationForm() {
       }
       const userData = JSON.parse(storedData);
 
-      // 3. CREATE OR UPDATE THE USER PROFILE (Upsert fixes the 409 Conflict)
+      // 3. CREATE OR UPDATE THE USER PROFILE
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert(
@@ -178,7 +232,6 @@ export default function RegistrationForm() {
             phone: userData.phone || null,
             address: userData.location || null
           },
-          // CRITICAL: onConflict tells Supabase to handle the duplicate ID silently
           { onConflict: 'id', ignoreDuplicates: false }
         );
 
@@ -187,8 +240,7 @@ export default function RegistrationForm() {
         throw new Error('Failed to create user profile');
       }
 
-      // 4. Update Email Confirmation Status (Optional based on Supabase settings)
-      // This is safe to keep now that the profile is created/updated
+      // 4. Update Email Confirmation Status
       await supabase.auth.updateUser({
         data: { email_confirmed_at: new Date().toISOString() }
       });
@@ -356,6 +408,7 @@ export default function RegistrationForm() {
                     color: "#b91c1c",
                   }}
                   required
+                  maxLength={100}
                 />
               </div>
 
@@ -376,6 +429,7 @@ export default function RegistrationForm() {
                     color: "#b91c1c",
                   }}
                   required
+                  maxLength={100}
                 />
               </div>
 
@@ -385,7 +439,7 @@ export default function RegistrationForm() {
                 </label>
                 <input
                   type="tel"
-                  placeholder="(555) 123-4567"
+                  placeholder="+1 (555) 123-4567"
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
@@ -395,6 +449,7 @@ export default function RegistrationForm() {
                     borderColor: "#fca5a5",
                     color: "#b91c1c",
                   }}
+                  maxLength={20}
                 />
               </div>
 
@@ -414,6 +469,7 @@ export default function RegistrationForm() {
                     borderColor: "#fca5a5",
                     color: "#b91c1c",
                   }}
+                  maxLength={150}
                 />
               </div>
 
@@ -458,6 +514,7 @@ export default function RegistrationForm() {
                       color: "#b91c1c",
                     }}
                     required
+                    maxLength={100}
                   />
                   <button
                     type="button"
@@ -488,6 +545,7 @@ export default function RegistrationForm() {
                       color: "#b91c1c",
                     }}
                     required
+                    maxLength={100}
                   />
                   <button
                     type="button"

@@ -2,11 +2,13 @@ import { trackProductView, trackProductClick, trackCartAdd } from '../utils/anal
 import { useState, useEffect } from 'react';
 import { X, Minus, Plus, ShoppingCart, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext'; // Add this import
 
 const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const { profile } = useAuth(); // Get profile info (contains role)
 
   // Track product view when modal opens
   useEffect(() => {
@@ -61,6 +63,13 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const productImages = product.image_url ? [product.image_url] : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=800&fit=crop'];
 
   if (!product) return null;
+
+  // Check if user is a retailer or wholesaler (both cannot add to cart)
+  const isRetailerOrWholesaler = profile?.role === 'retailer' || profile?.role === 'wholesaler'
+console.log('🔍 DEBUG ProductCard:');
+console.log('Profile:', profile);
+console.log('Profile role:', profile?.role);
+console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
 
   return (
     <>
@@ -183,8 +192,8 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
               </div>
             </div>
 
-            {/* Quantity Selector */}
-            {product.stock_quantity > 0 && (
+            {/* Quantity Selector - Hidden for Retailers and Wholesalers */}
+            {!isRetailerOrWholesaler && product.stock_quantity > 0 && (
               <div className="pt-4 border-t-2" style={{ borderColor: '#fca5a5' }}>
                 <label className="block font-bold mb-3" style={{ color: '#b91c1c' }}>
                   Quantity
@@ -218,31 +227,33 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
               </div>
             )}
 
-            {/* Add to Cart Button */}
-            <button
-              onClick={handleAddToCart}
-              disabled={product.stock_quantity === 0 || isLoading}
-              className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all flex items-center justify-center shadow-lg hover:shadow-xl ${
-                product.stock_quantity === 0 || isLoading
-                  ? 'opacity-50 cursor-not-allowed'
-                  : ''
-              }`}
-              style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent mr-2"></div>
-                  Adding to Cart...
-                </>
-              ) : product.stock_quantity === 0 ? (
-                'Out of Stock'
-              ) : (
-                <>
-                  <ShoppingCart size={24} className="mr-2" />
-                  Add {quantity} to Cart
-                </>
-              )}
-            </button>
+            {/* Add to Cart Button - Hidden for Retailers and Wholesalers */}
+            {!isRetailerOrWholesaler && (
+              <button
+                onClick={handleAddToCart}
+                disabled={product.stock_quantity === 0 || isLoading}
+                className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all flex items-center justify-center shadow-lg hover:shadow-xl ${
+                  product.stock_quantity === 0 || isLoading
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
+                }`}
+                style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent mr-2"></div>
+                    Adding to Cart...
+                  </>
+                ) : product.stock_quantity === 0 ? (
+                  'Out of Stock'
+                ) : (
+                  <>
+                    <ShoppingCart size={24} className="mr-2" />
+                    Add {quantity} to Cart
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           {/* Seller Information Card */}

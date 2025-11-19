@@ -1,8 +1,10 @@
 import { ShoppingCart, Store } from "lucide-react"
 import { useState } from "react"
+import { useAuth } from "../contexts/AuthContext" // Add this import
 
 const ProductCard = ({ product, onAddToCart }) => {
   const [isLoading, setIsLoading] = useState(false)
+  const { profile } = useAuth() // Get profile info (contains role)
 
   const handleAddToCart = async () => {
     if (!product || product.stock_quantity === 0) return;
@@ -18,6 +20,13 @@ const ProductCard = ({ product, onAddToCart }) => {
   }
 
   if (!product) return null
+
+  // Check if user is a retailer or wholesaler (both cannot add to cart)
+  const isRetailerOrWholesaler = profile?.role === 'retailer' || profile?.role === 'wholesaler'
+console.log('🔍 DEBUG ProductCard:');
+console.log('Profile:', profile);
+console.log('Profile role:', profile?.role);
+console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
 
   return (
     <div className="group bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden border-2" style={{ borderColor: '#E8B4B8' }}>
@@ -83,31 +92,33 @@ const ProductCard = ({ product, onAddToCart }) => {
           </div>
         </div>
 
-        {/* Add to Cart Button */}
-        <button
-          onClick={handleAddToCart}
-          disabled={product.stock_quantity === 0 || isLoading}
-          className={`w-full py-3 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center space-x-2 shadow-md ${
-            product.stock_quantity === 0 || isLoading
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "active:scale-95 hover:shadow-lg"
-          }`}
-          style={product.stock_quantity === 0 || isLoading ? {} : { backgroundColor: '#E88B8B' }}
-        >
-          {isLoading ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-3 border-white border-t-transparent"></div>
-              <span>Adding...</span>
-            </>
-          ) : product.stock_quantity === 0 ? (
-            <span>Out of Stock</span>
-          ) : (
-            <>
-              <ShoppingCart size={20} />
-              <span>Add to Cart</span>
-            </>
-          )}
-        </button>
+        {/* Add to Cart Button - Hidden for Retailers and Wholesalers */}
+        {!isRetailerOrWholesaler && (
+          <button
+            onClick={handleAddToCart}
+            disabled={product.stock_quantity === 0 || isLoading}
+            className={`w-full py-3 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center space-x-2 shadow-md ${
+              product.stock_quantity === 0 || isLoading
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "active:scale-95 hover:shadow-lg"
+            }`}
+            style={product.stock_quantity === 0 || isLoading ? {} : { backgroundColor: '#E88B8B' }}
+          >
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-3 border-white border-t-transparent"></div>
+                <span>Adding...</span>
+              </>
+            ) : product.stock_quantity === 0 ? (
+              <span>Out of Stock</span>
+            ) : (
+              <>
+                <ShoppingCart size={20} />
+                <span>Add to Cart</span>
+              </>
+            )}
+          </button>
+        )}
 
         {/* Seller Info */}
         {product.profiles && (
