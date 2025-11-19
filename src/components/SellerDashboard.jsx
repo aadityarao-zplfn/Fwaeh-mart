@@ -1,44 +1,44 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // Accesses src/lib/supabase
-import { useAuth } from '../contexts/AuthContext'; // Accesses src/contexts/AuthContext
-import ProductManagement from './ProductManagement'; // Accesses src/components/ProductManagement
-import AnalyticsOverview from './AnalyticsOverview'; // Accesses src/components/AnalyticsOverview
-import WholesalerCatalog from './WholesalerCatalog'; // Accesses src/components/WholesalerCatalog
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import ProductManagement from './ProductManagement';
+import AnalyticsOverview from './AnalyticsOverview';
+import WholesalerCatalog from './WholesalerCatalog';
 
 const SellerDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({ totalSales: 0, totalOrders: 0, totalProducts: 0 });
-  const [loading, setLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true); // ✅ Renamed to avoid conflict
   const [activeTab, setActiveTab] = useState('products');
+  
   // 🎯 CRITICAL: Get profile to check the user's role
-  const { user, profile, error } = useAuth();
+  const { user, profile, loading: authLoading, error: authError } = useAuth(); // ✅ Renamed auth loading/error
 
-  if (loading) {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#ff5757' }}></div>
-      <span className="ml-4 text-red-600 font-semibold">Loading your account...</span>
-    </div>
-  );
-}
+  // ✅ Handle auth states FIRST - before any data fetching
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#ff5757' }}></div>
+        <span className="ml-4 text-red-600 font-semibold">Loading your account...</span>
+      </div>
+    );
+  }
 
-if (error) {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <span className="text-red-600 font-semibold">Error: {error}</span>
-    </div>
-  );
-}
+  if (authError) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <span className="text-red-600 font-semibold">Error: {authError}</span>
+      </div>
+    );
+  }
 
-if (!user || !profile) {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <span className="text-red-600 font-semibold">Unable to load your profile. Please try logging in again.</span>
-    </div>
-  );
-}
-
-
+  if (!user || !profile) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <span className="text-red-600 font-semibold">Unable to load your profile. Please try logging in again.</span>
+      </div>
+    );
+  }
 
   useEffect(() => {
     // Ensure user is loaded before fetching data
@@ -48,9 +48,9 @@ if (!user || !profile) {
   }, [user]);
 
   const fetchSellerData = async () => {
-    // ⚠️ Note: This fetch handles both Retailer and Wholesaler orders, 
-    // retrieving items where the current user is the seller (seller_id = user.id).
     try {
+      setDashboardLoading(true);
+      
       const { data: orderItems, error: itemsError } = await supabase
         .from('order_items')
         .select('*, orders(id, created_at, status, shipping_address), products(name, image_url)')
@@ -64,7 +64,6 @@ if (!user || !profile) {
 
       if (orderItems) {
         orderItems.forEach(item => {
-          // Guard against null orders data if RLS filters out the order
           if (item.orders && !orderMap.has(item.orders.id)) {
             orderMap.set(item.orders.id, {
               ...item.orders,
@@ -98,17 +97,19 @@ if (!user || !profile) {
     } catch (error) {
       console.error('Error fetching seller data:', error);
     } finally {
-      setLoading(false);
+      setDashboardLoading(false);
     }
   };
 
-  if (loading) {
+  // ✅ REMOVED DUPLICATE LOADING CHECK - only handle dashboard loading for content
+  if (dashboardLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div 
           className="animate-spin rounded-full h-12 w-12 border-b-2" 
           style={{ borderColor: '#ff5757' }}
         ></div>
+        <span className="ml-4 text-red-600 font-semibold">Loading dashboard data...</span>
       </div>
     );
   }
@@ -165,7 +166,7 @@ if (!user || !profile) {
       {/* Content based on active tab */}
       {activeTab === 'products' ? (
         <>
-          {/* Enhanced Stats Cards (Kept concise) */}
+          {/* Enhanced Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {/* Total Sales */}
             <div className="rounded-xl p-6 text-white shadow-lg transition-transform hover:-translate-y-1 cursor-pointer" 
@@ -326,7 +327,6 @@ if (!user || !profile) {
           </div>
         </>
       ) : activeTab === 'catalog' && profile?.role === 'retailer' ? (
-        // 🎯 RENDER: Show WholesalerCatalog only if tab is active AND role is retailer
         <WholesalerCatalog />
       ) : (
         <AnalyticsOverview />
