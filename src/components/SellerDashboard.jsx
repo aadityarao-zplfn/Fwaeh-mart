@@ -11,7 +11,34 @@ const SellerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('products');
   // 🎯 CRITICAL: Get profile to check the user's role
-  const { user, profile } = useAuth(); 
+  const { user, profile, error } = useAuth();
+
+  if (loading) {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#ff5757' }}></div>
+      <span className="ml-4 text-red-600 font-semibold">Loading your account...</span>
+    </div>
+  );
+}
+
+if (error) {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <span className="text-red-600 font-semibold">Error: {error}</span>
+    </div>
+  );
+}
+
+if (!user || !profile) {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <span className="text-red-600 font-semibold">Unable to load your profile. Please try logging in again.</span>
+    </div>
+  );
+}
+
+
 
   useEffect(() => {
     // Ensure user is loaded before fetching data

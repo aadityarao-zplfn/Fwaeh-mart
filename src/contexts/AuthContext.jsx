@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // Add this at the top of AuthProvider
   const fetchingProfile = useRef(false); // Prevent duplicate fetches
 
   useEffect(() => {
@@ -70,22 +71,27 @@ export const AuthProvider = ({ children }) => {
     }
     
     fetchingProfile.current = true;
+    setError(null);
     console.log('🔄 Fetching profile for:', userId);
     
+    const startTime = Date.now();
+    console.log('🔄 Fetching profile for:', userId);
+
     try {
       // ADD TIMEOUT
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 30000)
       );
       
       const fetchPromise = supabase
         .from('profiles')
-        .select('*')
+        .select('id, role, full_name')
         .eq('id', userId)
         .maybeSingle();
   
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
   
+      console.log(`⏱️ Fetch time: ${Date.now() - startTime}ms`);
       console.log('📦 Profile data:', data, 'Error:', error);
   
       if (error) throw error;
@@ -94,7 +100,14 @@ export const AuthProvider = ({ children }) => {
       console.log('✅ Profile set successfully');
     } catch (error) {
       console.error('❌ Error in fetchProfile:', error);
+
+      if (retries > 0) {
+      console.log(`🔄 Retrying fetchProfile... (${retries} retries left)`);
+      await fetchProfile(userId, retries - 1); // Retry the fetch
+    } else {
       setProfile(null);
+      setError(error.message || 'Failed to fetch profile');
+    }
     } finally {
       setLoading(false);
       fetchingProfile.current = false;
@@ -163,6 +176,7 @@ export const AuthProvider = ({ children }) => {
     user,
     profile,
     loading,
+    error,
     signIn,
     signOut,
     resendConfirmationEmail,
