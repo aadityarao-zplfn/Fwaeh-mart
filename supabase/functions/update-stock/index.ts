@@ -15,15 +15,17 @@ serve(async (req) => {
   try {
     console.log('🔄 Edge Function started');
     
-    // Get environment variables with fallbacks
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    // ✅ FIX: Use non-reserved variable name (SERVICE_ROLE_KEY)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') // This is usually auto-set correctly
+    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') // <--- NEW VARIABLE NAME
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing environment variables')
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('💥 Error: Missing SUPABASE_URL or SERVICE_ROLE_KEY');
+      throw new Error('Missing environment variables. Did you set SERVICE_ROLE_KEY in Secrets?');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Create client with Service Role Key
+    const supabase = createClient(supabaseUrl, serviceRoleKey) // Use the new variable
     
     // Parse request body
     const { productId, quantity, operation } = await req.json()
@@ -32,7 +34,7 @@ serve(async (req) => {
     // Basic validation
     if (!productId || quantity === undefined || !operation) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Missing required fields: productId, quantity, or operation' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -42,13 +44,21 @@ serve(async (req) => {
       .from('products')
       .select('stock_quantity')
       .eq('id', productId)
-      .single()
+      .maybeSingle()
 
     if (fetchError) {
-      console.error('Fetch error:', fetchError);
-      throw new Error('Product not found')
+      console.error('Fetch error during initial query:', fetchError);
+      throw fetchError;
     }
 
+    if (!product) {
+      console.error('💥 Error: Product not found with ID:', productId);
+      return new Response(
+        JSON.stringify({ error: 'Product not found. Stock update aborted.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
     console.log('Current stock:', product.stock_quantity);
 
     let newStock = product.stock_quantity
@@ -58,7 +68,7 @@ serve(async (req) => {
       newStock += quantity
     } else if (operation === 'subtract') {
       newStock -= quantity
-      if (newStock < 0) newStock = 0 // Don't allow negative, just set to 0
+      if (newStock < 0) newStock = 0 
     } else if (operation === 'set') {
       newStock = quantity
     } else {
@@ -97,7 +107,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error.message || 'An unknown server error occurred',
         note: 'Check function logs for details'
       }),
       { 

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, Truck, CheckCircle, Lock, ArrowLeft, MapPin, Phone, Mail, User, Package, Banknote, Smartphone, Shield, Edit2, ArrowRight } from 'lucide-react';
+import { subtractStock } from '../utils/inventory'; // ✅ REQUIRED for secure stock deduction
+import { CreditCard, CheckCircle, Lock, ArrowLeft, MapPin, Phone, Mail, User, Package, Banknote, Smartphone, Shield, Edit2, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Checkout = () => {
@@ -22,7 +23,7 @@ const Checkout = () => {
     saveAddress: false
   });
 
-  const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
 
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -30,7 +31,6 @@ const Checkout = () => {
   useEffect(() => {
     if (user) {
       fetchCartItems();
-      // Pre-fill with profile data if available
       if (profile) {
         setShippingInfo(prev => ({
           ...prev,
@@ -76,7 +76,7 @@ const Checkout = () => {
   const calculateOrderSummary = () => {
     const subtotal = calculateTotal();
     const tax = subtotal * 0.1; // 10% GST
-    const shipping = subtotal > 500 ? 0 : 50; // Free shipping above ₹500
+    const shipping = subtotal > 500 ? 0 : 50; 
     const total = subtotal + tax + shipping;
     
     return { subtotal, tax, shipping, total };
@@ -87,20 +87,15 @@ const Checkout = () => {
       toast.error('Please fill all shipping information');
       return false;
     }
-
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(shippingInfo.email)) {
       toast.error('Please enter a valid email');
       return false;
     }
-
-    // Phone validation (basic)
     if (shippingInfo.phone.length < 10) {
       toast.error('Please enter a valid phone number');
       return false;
     }
-
     return true;
   };
 
@@ -125,30 +120,99 @@ const Checkout = () => {
     }));
   };
 
-const handlePlaceOrder = async () => {
-  if (!shippingInfo.address.trim()) {
-    toast.error('Please enter a shipping address');
-    return;
-  }
+  const handlePlaceOrder = async () => {
+    setPlacing(true);
+    const toastId = toast.loading('Processing payment...');
 
-  const orderDetails = {
-    subtotal: calculateTotal(),
-    shipping: calculateOrderSummary().shipping,
-    tax: calculateTotal() * 0.1, // 10% tax
-    total: calculateTotal() * 1.1
+    try {
+      // 1. Simulate Payment Gateway
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const fullAddress = `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`;
+      const { total } = calculateOrderSummary();
+
+      // 2. Create Order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([
+          {
+            user_id: user.id,
+            total_amount: total,
+            shipping_address: fullAddress,
+            status: 'pending',
+            payment_method: paymentMethod,
+            contact_phone: shippingInfo.phone,
+            contact_email: shippingInfo.email,
+            contact_name: shippingInfo.fullName,
+          },
+        ])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 3. Create Order Items
+      const orderItems = cartItems.map((item) => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        seller_id: item.products.seller_id,
+        quantity: item.quantity,
+        price_at_purchase: item.products.price,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // 4. ✅ UPDATE STOCK SECURELY (using Edge Function via subtractStock)
+      for (const item of cartItems) {
+        const result = await subtractStock(item.product_id, item.quantity);
+        
+        if (!result.success) {
+          console.error(`Stock update failed for ${item.products.name}:`, result.error);
+        }
+      }
+
+      // 5. Clear Cart
+      const { error: clearCartError } = await supabase
+        .from('cart_items')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (clearCartError) throw clearCartError;
+
+      // 6. Create Notification
+      await supabase.from('notifications').insert([{
+        user_id: user.id,
+        title: 'Order Placed Successfully! 🎉',
+        message: `Order #${order.id.slice(0, 8)} for ₹${total.toFixed(2)} has been confirmed.`,
+        type: 'order',
+        read: false
+      }]);
+
+      // 7. Save Profile Address
+      if (shippingInfo.saveAddress) {
+        await supabase
+          .from('profiles')
+          .update({
+            address: fullAddress,
+            phone: shippingInfo.phone,
+            full_name: shippingInfo.fullName
+          })
+          .eq('id', user.id);
+      }
+
+      toast.success('Order placed successfully!', { id: toastId });
+      navigate('/orders');
+    } catch (error) {
+      console.error('Error placing order:', error);
+      toast.error('Failed to place order: ' + error.message, { id: toastId });
+    } finally {
+      setPlacing(false);
+    }
   };
-
-  // Navigate to payment page instead of placing order directly
-  navigate('/payment', { 
-    state: { 
-      orderDetails,
-      cartItems,
-      shippingAddress: `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`,
-      shippingInfo,
-      paymentMethod
-    } 
-  });
-};
 
   if (loading) {
     return (
@@ -168,7 +232,6 @@ const handlePlaceOrder = async () => {
 
   return (
     <div style={{ background: 'linear-gradient(to bottom, #f3d7d7, #f9e5e5)' }} className="min-h-screen">
-      {/* Header */}
       <header className="px-6 py-4 flex justify-between items-center" style={{ background: 'rgba(255, 255, 255, 0.5)' }}>
         <h1 className="text-2xl font-bold" style={{ color: '#a94442' }}>Fwaeh Mart</h1>
         <div className="flex gap-4 items-center">
@@ -178,7 +241,6 @@ const handlePlaceOrder = async () => {
       </header>
 
       <div className="max-w-7xl mx-auto py-12 px-4">
-        {/* Back Button */}
         <button
           onClick={() => navigate('/cart')}
           className="flex items-center mb-6 transition-all hover:opacity-80"
@@ -195,7 +257,6 @@ const handlePlaceOrder = async () => {
               const Icon = step.icon;
               const isActive = currentStep === step.number;
               const isCompleted = currentStep > step.number;
-              
               return (
                 <div key={step.number} className="flex items-center">
                   <div className="flex flex-col items-center">
@@ -252,7 +313,6 @@ const handlePlaceOrder = async () => {
                   <h2 className="text-3xl font-bold mb-6" style={{ color: '#a94442' }}>
                     Shipping Information
                   </h2>
-                  
                   <div className="space-y-5">
                     <div>
                       <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
@@ -269,7 +329,6 @@ const handlePlaceOrder = async () => {
                         style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
                       />
                     </div>
-
                     <div className="grid md:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
@@ -286,7 +345,6 @@ const handlePlaceOrder = async () => {
                           style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
                         />
                       </div>
-
                       <div>
                         <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
                           <Phone size={16} className="inline mr-2" />
@@ -303,7 +361,6 @@ const handlePlaceOrder = async () => {
                         />
                       </div>
                     </div>
-
                     <div>
                       <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
                         <MapPin size={16} className="inline mr-2" />
@@ -319,7 +376,6 @@ const handlePlaceOrder = async () => {
                         style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
                       />
                     </div>
-
                     <div className="grid md:grid-cols-3 gap-5">
                       <div>
                         <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
@@ -335,7 +391,6 @@ const handlePlaceOrder = async () => {
                           style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
                         />
                       </div>
-
                       <div>
                         <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
                           State *
@@ -350,7 +405,6 @@ const handlePlaceOrder = async () => {
                           style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
                         />
                       </div>
-
                       <div>
                         <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
                           Pincode *
@@ -366,7 +420,6 @@ const handlePlaceOrder = async () => {
                         />
                       </div>
                     </div>
-
                     <div className="pt-4">
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
@@ -392,9 +445,7 @@ const handlePlaceOrder = async () => {
                   <h2 className="text-3xl font-bold mb-6" style={{ color: '#a94442' }}>
                     Payment Method
                   </h2>
-
                   <div className="space-y-4">
-                    {/* Razorpay Option */}
                     <div
                       className={`rounded-xl p-6 cursor-pointer transition-all ${
                         paymentMethod === 'razorpay' ? 'shadow-lg' : ''
@@ -428,28 +479,15 @@ const handlePlaceOrder = async () => {
                             Pay securely using Credit/Debit Card, UPI, Net Banking, or Wallet
                           </p>
                           <div className="flex gap-3 items-center flex-wrap">
-                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>
-                              VISA
-                            </div>
-                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>
-                              Mastercard
-                            </div>
-                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>
-                              RuPay
-                            </div>
-                            <div className="px-3 py-1 rounded text-xs font-bold flex items-center gap-1" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>
-                              <Smartphone size={12} />
-                              UPI
-                            </div>
-                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>
-                              Wallets
-                            </div>
+                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>VISA</div>
+                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>Mastercard</div>
+                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>RuPay</div>
+                            <div className="px-3 py-1 rounded text-xs font-bold flex items-center gap-1" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}><Smartphone size={12} />UPI</div>
+                            <div className="px-3 py-1 rounded text-xs font-bold" style={{ background: '#fff', border: '1px solid #f8b4b4', color: '#a94442' }}>Wallets</div>
                           </div>
                         </div>
                       </label>
                     </div>
-
-                    {/* Cash on Delivery Option */}
                     <div
                       className={`rounded-xl p-6 cursor-pointer transition-all ${
                         paymentMethod === 'cod' ? 'shadow-lg' : ''
@@ -486,17 +524,11 @@ const handlePlaceOrder = async () => {
                       </label>
                     </div>
                   </div>
-
-                  {/* Security Badge */}
                   <div className="mt-6 p-4 rounded-xl flex items-center gap-3" style={{ background: 'rgba(76, 175, 80, 0.1)', border: '2px solid rgba(76, 175, 80, 0.3)' }}>
                     <Shield size={24} style={{ color: '#4caf50' }} />
                     <div>
-                      <p className="font-bold text-sm" style={{ color: '#2e7d32' }}>
-                        256-bit SSL Secure Payment
-                      </p>
-                      <p className="text-xs" style={{ color: '#4caf50' }}>
-                        Your payment information is encrypted and secure
-                      </p>
+                      <p className="font-bold text-sm" style={{ color: '#2e7d32' }}>256-bit SSL Secure Payment</p>
+                      <p className="text-xs" style={{ color: '#4caf50' }}>Your payment information is encrypted and secure</p>
                     </div>
                   </div>
                 </div>
@@ -508,9 +540,7 @@ const handlePlaceOrder = async () => {
                   <h2 className="text-3xl font-bold mb-6" style={{ color: '#a94442' }}>
                     Review Your Order
                   </h2>
-
                   <div className="space-y-6">
-                    {/* Shipping Address */}
                     <div className="rounded-xl p-6" style={{ background: 'rgba(255, 255, 255, 0.6)', border: '2px solid #f8b4b4' }}>
                       <div className="flex justify-between items-start mb-4">
                         <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: '#a94442' }}>
@@ -540,8 +570,6 @@ const handlePlaceOrder = async () => {
                         </p>
                       </div>
                     </div>
-
-                    {/* Payment Method */}
                     <div className="rounded-xl p-6" style={{ background: 'rgba(255, 255, 255, 0.6)', border: '2px solid #f8b4b4' }}>
                       <div className="flex justify-between items-start mb-4">
                         <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: '#a94442' }}>
@@ -571,8 +599,6 @@ const handlePlaceOrder = async () => {
                         )}
                       </div>
                     </div>
-
-                    {/* Order Items */}
                     <div className="rounded-xl p-6" style={{ background: 'rgba(255, 255, 255, 0.6)', border: '2px solid #f8b4b4' }}>
                       <h3 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: '#a94442' }}>
                         <Package size={20} />
@@ -655,8 +681,6 @@ const handlePlaceOrder = async () => {
               <h3 className="text-2xl font-bold mb-6" style={{ color: '#a94442' }}>
                 Order Summary
               </h3>
-
-              {/* Price Breakdown */}
               <div className="space-y-4 mb-6 pb-6" style={{ borderBottom: '2px solid #f8b4b4' }}>
                 <div className="flex justify-between" style={{ color: '#cd5c5c' }}>
                   <span>Subtotal ({cartItems.length} items)</span>
@@ -671,8 +695,6 @@ const handlePlaceOrder = async () => {
                   <span className="font-bold">₹{tax.toFixed(2)}</span>
                 </div>
               </div>
-
-              {/* Total */}
               <div className="mb-6 py-6" style={{ borderBottom: '2px solid #f8b4b4' }}>
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-bold" style={{ color: '#a94442' }}>Total Amount</span>
@@ -681,28 +703,18 @@ const handlePlaceOrder = async () => {
                   </span>
                 </div>
               </div>
-
-              {/* Security Badges */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'rgba(76, 175, 80, 0.1)' }}>
                   <Lock size={20} style={{ color: '#4caf50' }} />
-                  <span className="text-sm font-medium" style={{ color: '#2e7d32' }}>
-                    Secure Checkout
-                  </span>
+                  <span className="text-sm font-medium" style={{ color: '#2e7d32' }}>Secure Checkout</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'rgba(76, 175, 80, 0.1)' }}>
                   <Shield size={20} style={{ color: '#4caf50' }} />
-                  <span className="text-sm font-medium" style={{ color: '#2e7d32' }}>
-                    256-bit SSL Encryption
-                  </span>
+                  <span className="text-sm font-medium" style={{ color: '#2e7d32' }}>256-bit SSL Encryption</span>
                 </div>
               </div>
-
-              {/* Items List */}
               <div className="mt-6 pt-6" style={{ borderTop: '2px solid #f8b4b4' }}>
-                <h4 className="text-sm font-bold mb-4" style={{ color: '#a94442' }}>
-                  ITEMS IN YOUR ORDER
-                </h4>
+                <h4 className="text-sm font-bold mb-4" style={{ color: '#a94442' }}>ITEMS IN YOUR ORDER</h4>
                 <div className="space-y-2">
                   {cartItems.map(item => (
                     <div key={item.id} className="flex justify-between text-sm" style={{ color: '#cd5c5c' }}>

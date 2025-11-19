@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ShoppingCart, LogOut, LayoutDashboard } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const { user, profile, signOut } = useAuth();
@@ -124,6 +125,10 @@ const Navbar = () => {
                   <LayoutDashboard size={20} className="mr-1" />
                   <span className="hidden sm:inline">Dashboard</span>
                 </Link>
+                
+                {/* Notification Bell */}
+                <NotificationBell />
+
                 <button
                   onClick={handleSignOut}
                   className="flex items-center font-medium transition-all hover:opacity-80"

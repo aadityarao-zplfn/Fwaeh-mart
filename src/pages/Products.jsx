@@ -34,7 +34,7 @@ const Products = () => {
     distance: false
   });
 
-  // Fetch products once
+  // 1. Fetch products on load
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -59,6 +59,37 @@ const Products = () => {
         }
       );
     }
+  }, []);
+
+  // 3. ✅ REAL-TIME SUBSCRIPTION FOR STOCK CHANGES
+  useEffect(() => {
+    console.log('🔌 Subscribing to public.products updates...');
+    const subscription = supabase
+      .channel('product-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'products',
+        },
+        (payload) => {
+          console.log('⚡ Real-time update received:', payload);
+          // Update the local product state when a change happens
+          setProducts((currentProducts) =>
+            currentProducts.map((p) =>
+              // Merge the new data (payload.new) into the existing product (p)
+              p.id === payload.new.id ? { ...p, ...payload.new } : p
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🗑️ Unsubscribing from product updates.');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchProducts = async () => {
