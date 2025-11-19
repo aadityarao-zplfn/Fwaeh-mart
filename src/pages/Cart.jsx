@@ -47,9 +47,21 @@ const Cart = () => {
     try {
       const { data, error } = await supabase
         .from('cart_items')
-        .select('*, products(*, profiles(full_name))')
+        .select(`
+          id,
+          quantity,
+          created_at,
+          products:product_id(
+            id,
+            name,
+            price,
+            image_url,
+            stock_quantity,
+            seller:profiles!seller_id(full_name)
+          )
+        `)
         .eq('user_id', user.id);
-
+  
       if (error) throw error;
       setCartItems(data || []);
     } catch (error) {
@@ -62,14 +74,18 @@ const Cart = () => {
 
   const fetchRecommendedProducts = async () => {
     try {
-      // Fetch actual products from your database that aren't already in cart
+      // Get product IDs from cart, handle empty case
+      const productIds = cartItems.length > 0 
+        ? cartItems.map(item => item.product_id) 
+        : ['00000000-0000-0000-0000-000000000000']; // dummy UUID
+      
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .neq('id', cartItems.map(item => item.product_id))
+        .not('id', 'in', `(${productIds.join(',')})`)
         .limit(4)
         .order('created_at', { ascending: false });
-
+  
       if (error) throw error;
       setRecommendedProducts(data || []);
     } catch (error) {
@@ -293,8 +309,8 @@ const Cart = () => {
                       {item.products.name}
                     </h3>
                     <p className="text-sm mb-2" style={{ color: '#cd5c5c' }}>
-                      Sold by {item.products.profiles?.full_name || 'Unknown Seller'}
-                    </p>
+                        Sold by {item.products.seller?.full_name || 'Unknown Seller'}
+                      </p>
                     
                     {/* Stock Warning */}
                     {item.products.stock_quantity <= 5 && (

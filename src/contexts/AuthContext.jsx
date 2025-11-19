@@ -17,195 +17,110 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const fetchingProfile = useRef(false);
-  const authInitialized = useRef(false);
+  const initialized = useRef(false);
 
+  // SIMPLIFIED: One-time auth initialization
   useEffect(() => {
-    // Prevent multiple initializations
-    if (authInitialized.current) return;
-    authInitialized.current = true;
+    if (initialized.current) return;
+    initialized.current = true;
 
     console.log('🚀 Initializing auth...');
 
-    const initAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session:', error);
-          setLoading(false);
-          return;
-        }
-
-        console.log('👤 Session found:', session?.user?.id);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('👤 Initial session:', session?.user?.id);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
         setLoading(false);
       }
-    };
+    });
 
-    initAuth();
-
-    // Listen for auth changes
+    // Listen for auth changes - SIMPLIFIED
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔑 Auth event:', event, 'User:', session?.user?.id);
+        console.log('🔑 Auth event:', event);
         
-        // Only update if user actually changed
-        if (session?.user?.id !== user?.id) {
+        // Only process meaningful events
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
           setUser(session?.user ?? null);
-        }
-        
-        if (session?.user && !fetchingProfile.current) {
-          await fetchProfile(session.user.id);
-        } else if (!session?.user) {
-          // User signed out - clear everything immediately
-          setProfile(null);
-          setLoading(false);
-          fetchingProfile.current = false;
+          
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+            setLoading(false);
+          }
         }
       }
     );
 
     return () => {
       subscription.unsubscribe();
-      authInitialized.current = false;
     };
   }, []);
 
-  const fetchProfile = async (userId, retries = 0) => {
-    if (fetchingProfile.current) {
-      console.log('⏭️ Skipping duplicate profile fetch');
-      return;
-    }
-    
-    fetchingProfile.current = true;
-    setError(null);
-    console.log('📞 Fetching profile for:', userId);
-    
-    const startTime = Date.now();
-
+  // SIMPLIFIED: Fetch profile without retries or emergency fallbacks
+  const fetchProfile = async (userId) => {
     try {
-      // Reduced timeout from 30s to 8s
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 500)
-      );
+      console.log('📞 Fetching profile for:', userId);
       
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('id, role, full_name')
         .eq('id', userId)
         .maybeSingle();
-  
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-  
-      console.log(`⏱️ Profile fetch took ${Date.now() - startTime}ms`);
-      
+
       if (error) {
-        console.error('❌ Supabase error:', error);
-        throw error;
+        console.error('❌ Profile fetch error:', error);
+        return;
       }
       
       if (data) {
         console.log('✅ Profile found:', data);
         setProfile(data);
       } else {
-        console.log('⚠️ No profile found, creating default profile...');
-        await createDefaultProfile(userId);
+        console.log('⚠️ No profile found');
+        // Create profile immediately without fallbacks
+        await createProfile(userId);
       }
-      
     } catch (error) {
-      console.error('❌ Error in fetchProfile:', error);
-      
-      // ✅ FIXED: retries is now defined and works properly
-      if (retries > 0) {
-        console.log(`🔄 Retrying profile fetch... (${retries} retries left)`);
-        fetchingProfile.current = false;
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
-        await fetchProfile(userId, retries - 1);
-        return;
-      } else {
-        console.error('💥 All retries failed, using emergency profile');
-        setError('Failed to load profile');
-        // Create emergency profile to prevent app from hanging
-        await createEmergencyProfile(userId);
-      }
+      console.error('❌ Unexpected error:', error);
     } finally {
       setLoading(false);
-      fetchingProfile.current = false;
-      console.log('🏁 Profile fetch process completed');
     }
   };
 
-  const createDefaultProfile = async (userId) => {
+  // SIMPLIFIED: Create profile
+  const createProfile = async (userId) => {
     try {
-      console.log('🆕 Creating default profile for:', userId);
-      
-      // First check if profile was created by another process
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (existingProfile) {
-        console.log('✅ Profile already exists, fetching it');
-        setProfile(existingProfile);
-        return;
-      }
-      
-      // Create new profile
       const { data, error } = await supabase
         .from('profiles')
         .insert([
           { 
             id: userId, 
-            role: 'retailer', // Default role
+            role: 'retailer',
             full_name: user?.email?.split('@')[0] || 'User',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
           }
         ])
         .select()
         .single();
 
-      if (error) {
-        console.error('❌ Error creating profile:', error);
-        throw error;
-      }
-
-      console.log('✅ Default profile created:', data);
-      setProfile(data);
+      if (error) throw error;
       
+      console.log('✅ Profile created:', data);
+      setProfile(data);
     } catch (error) {
       console.error('❌ Failed to create profile:', error);
-      // Even if creation fails, set a local profile to allow app to load
+      // Set a basic profile to allow app to function
       setProfile({
         id: userId,
         role: 'retailer',
         full_name: user?.email?.split('@')[0] || 'User'
       });
     }
-  };
-
-  const createEmergencyProfile = async (userId) => {
-    console.log('🚨 Creating emergency profile for:', userId);
-    // Create a local profile object without saving to database
-    const emergencyProfile = {
-      id: userId,
-      role: 'retailer',
-      full_name: user?.email?.split('@')[0] || 'User'
-    };
-    
-    setProfile(emergencyProfile);
-    console.log('✅ Emergency profile set');
   };
 
   const signIn = async (email, password) => {
@@ -221,9 +136,9 @@ export const AuthProvider = ({ children }) => {
       if (data.user) {
         const isVerified = await isUserOTPVerified(data.user.id);
         if (!isVerified) {
-          throw new Error('Please complete OTP verification before signing in. Check your email for the verification code.');
+          throw new Error('Please complete OTP verification before signing in.');
         }
-        await fetchProfile(data.user.id);
+        // Profile will be fetched via auth state change
       }
 
       return { data, error: null };
@@ -233,39 +148,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const resendConfirmationEmail = async (email) => {
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/login`,
-        }
-      });
-
-      if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      return { error };
-    }
-  };
-
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      // Immediate state reset for better UX
+      await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
       setLoading(false);
-      fetchingProfile.current = false;
-      
-      window.localStorage.removeItem('fwaeh-mart-auth');
-      
     } catch (error) {
       console.error('Error signing out:', error);
-      setLoading(false);
     }
   };
 
@@ -276,7 +166,6 @@ export const AuthProvider = ({ children }) => {
     error,
     signIn,
     signOut,
-    resendConfirmationEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
