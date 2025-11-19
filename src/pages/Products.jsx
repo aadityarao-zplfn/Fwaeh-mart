@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import ProductCard from '../components/ProductCard';
-import ProductDetailModal from '../components/ProductDetailModal';
-import NearbyShopsMap from '../components/NearbyShopsMap';
+import { supabase } from '../lib/supabase'; // Accesses src/lib/supabase
+import { useAuth } from '../contexts/AuthContext'; // Accesses src/contexts/AuthContext
+import ProductCard from '../components/ProductCard'; // Accesses src/components/ProductCard
+import ProductDetailModal from '../components/ProductDetailModal'; // Accesses src/components/ProductDetailModal
+import NearbyShopsMap from '../components/NearbyShopsMap'; // Accesses src/components/NearbyShopsMap
 import { Search, SlidersHorizontal, X, ChevronDown, ChevronUp, Star, MapPin, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -39,7 +39,7 @@ const Products = () => {
     fetchProducts();
   }, []);
 
-  // Get user's current location
+  // Get user's current location (same as existing logic)
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -62,22 +62,33 @@ const Products = () => {
   }, []);
 
   const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, profiles(full_name, role, location_lat, location_lng, location_address)')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('products')
+      .select(`
+        *,
+        profiles!seller_id(full_name, role, location_lat, location_lng, location_address)
+      `)
+      .eq('is_active', true)
+      .or('is_public.is.true');
 
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('Failed to load products');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) throw error;
+
+    // Your filtering logic here
+    const filteredData = data.filter(product => 
+      product.profiles?.role === 'retailer' || product.is_public === true
+    );
+
+    setProducts(filteredData);
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    toast.error('Failed to load products');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Get categories from products
   const categories = useMemo(() => {
@@ -90,7 +101,7 @@ const Products = () => {
     return Math.ceil(Math.max(...products.map(p => parseFloat(p.price || 0))));
   }, [products]);
 
-  // Filter and sort products - MEMOIZED
+  // Filter and sort products - MEMOIZED (Same as existing logic)
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
@@ -119,15 +130,18 @@ const Products = () => {
       filtered = filtered.filter(p => p.stock_quantity > 0);
     }
 
-    // Rating filter
+    // Rating filter (assuming product object has a rating field)
     if (minRating > 0) {
       filtered = filtered.filter((product) => (product.rating || 0) >= minRating);
     }
 
     // Seller type filter
     if (sellerType !== 'all') {
-      filtered = filtered.filter((product) => product.seller_type === sellerType);
+      filtered = filtered.filter((product) => product.profiles?.role === sellerType);
     }
+    
+    // Distance filter logic remains the same (assuming geospatial calculation is elsewhere if needed)
+
 
     // Sort
     switch (sortBy) {
@@ -245,7 +259,7 @@ const Products = () => {
     </div>
   );
 
-  // Loading Skeleton
+  // Loading Skeleton (Same as existing logic)
   const SkeletonCard = () => (
     <div className="rounded-2xl overflow-hidden shadow-lg animate-pulse" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
       <div className="w-full h-48 bg-gradient-to-br from-red-100 to-red-200"></div>
