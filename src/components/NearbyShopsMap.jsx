@@ -120,7 +120,7 @@ const NearbyShopsMap = ({ products, userLocation }) => {
                     {product.profiles?.full_name}
                   </p>
                   <p className="font-bold text-xl" style={{ color: '#ff5757' }}>
-                    ${parseFloat(product.price).toFixed(2)}
+                    ₹{parseFloat(product.price).toFixed(2)}
                   </p>
                   {userLocation && product.profiles?.location_lat && (
                     <p className="text-xs mt-2 flex items-center" style={{ color: '#dc2626' }}>

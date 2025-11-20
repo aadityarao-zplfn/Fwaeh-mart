@@ -1,19 +1,18 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, BarChart3, Settings, MessageSquare, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, BarChart3, CreditCard, Users, HelpCircle, Settings, MessageSquare, Menu, X } from 'lucide-react';
 
 const RetailerDashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  const navItems = [
-    { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { path: '/dashboard/products', label: 'My Products', icon: Package },
-    { path: '/dashboard/orders', label: 'Orders', icon: ShoppingBag },
-   // { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-    { path: '/dashboard/reviews', label: 'Reviews', icon: MessageSquare },
-    { path: '/dashboard/settings', label: 'Shop Settings', icon: Settings }, // ✅ UPDATED LABEL
-  ];
+const navItems = [
+  { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+  { path: '/dashboard/payments', label: 'Payments pending', icon: CreditCard },
+  { path: '/dashboard/orders', label: 'Customer Orders', icon: ShoppingBag },
+  { path: '/dashboard/queries', label: 'Queries', icon: HelpCircle },
+  { path: '/dashboard/settings', label: 'Shop Settings', icon: Settings },
+];
 
   const isActive = (path) => location.pathname === path;
 

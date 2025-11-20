@@ -102,7 +102,7 @@ const fetchOrders = async () => {
                         <p className="text-xs text-gray-600">Quantity: {item.quantity}</p>
                       </div>
                       <p className="text-sm font-semibold">
-                        ${(parseFloat(item.price_at_purchase) * item.quantity).toFixed(2)}
+                        ₹{(parseFloat(item.price_at_purchase) * item.quantity).toFixed(2)}
                       </p>
                     </div>
                   ))}
@@ -116,7 +116,7 @@ const fetchOrders = async () => {
                 <div className="border-t pt-3 flex justify-between items-center mt-2">
                   <span className="font-semibold">Total Amount:</span>
                   <span className="text-xl font-bold text-primary-600">
-                    ${parseFloat(order.total_amount).toFixed(2)}
+                    ₹{parseFloat(order.total_amount).toFixed(2)}
                   </span>
                 </div>
               </div>

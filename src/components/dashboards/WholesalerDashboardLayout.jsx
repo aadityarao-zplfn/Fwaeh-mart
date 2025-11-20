@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, TruckIcon, BarChart3, Users, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, TruckIcon, BarChart3, Users, CreditCard, Settings, Menu, X } from 'lucide-react';
 
 const WholesalerDashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  const navItems = [
-    { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { path: '/dashboard/products', label: 'Bulk Products', icon: Package },
-    { path: '/dashboard/orders', label: 'Bulk Orders', icon: TruckIcon },
-    { path: '/dashboard/analytics', label: 'Sales Analytics', icon: BarChart3 },
-    { path: '/dashboard/retailers', label: 'Retailer Network', icon: Users },
-    { path: '/wholesaler/settings', label: 'Shop Settings', icon: Settings }, // ✅ CORRECT LINK & LABEL
-  ];
+const navItems = [
+  { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+  { path: '/dashboard/retailers', label: 'Retailers Network', icon: Users },
+  { path: '/dashboard/transactions', label: 'Transactions with retailers', icon: CreditCard },
+ // { path: '/dashboard/products', label: 'Bulk Products', icon: Package },
+  //{ path: '/dashboard/orders', label: 'Bulk Orders', icon: TruckIcon },
+  { path: '/wholesaler/settings', label: 'Shop Settings', icon: Settings },
+];
 
   const isActive = (path) => location.pathname === path;
 

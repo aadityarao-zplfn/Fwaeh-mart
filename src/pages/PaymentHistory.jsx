@@ -211,7 +211,7 @@ const PaymentHistory = () => {
                       </div>
                       <div>
                         <p className="font-bold text-2xl" style={{ color: '#a73636' }}>
-                          ${parseFloat(payment.total_amount).toFixed(2)}
+                          ₹{parseFloat(payment.total_amount).toFixed(2)}
                         </p>
                       </div>
                     </div>

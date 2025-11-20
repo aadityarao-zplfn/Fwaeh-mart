@@ -121,6 +121,28 @@ const processOrder = async (status = 'pending') => {
 };
   // Handle Razorpay payment
 const handleRazorpayPayment = async () => {
+  // 🎯 CHECK IF ON VERCEL - USE SIMULATION
+  if (window.location.hostname.includes('vercel.app')) {
+    const toastId = toast.loading('Placing your order...');
+    
+    try {
+      // Simulate payment processing (2 seconds)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 🚨 THIS IS THE KEY PART - ORDER STILL GETS PLACED!
+      await processOrder('pending');
+      
+      toast.success('Order placed successfully! (Demo Mode)', { id: toastId });
+      navigate('/orders');
+    } catch (error) {
+      console.error('ORDER PROCESSING FAILED:', error);
+      toast.error(`Order failed: ${error.message}`, { id: toastId });
+      setLoading(false);
+    }
+    return;
+  }
+
+  // 🎯 LOCALHOST - USE REAL RAZORPAY
   const res = await loadRazorpay();
 
   if (!res) {
@@ -130,7 +152,7 @@ const handleRazorpayPayment = async () => {
 
   const options = {
     key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-    amount: Math.round(orderSummary.total * 100), // Convert to paise
+    amount: Math.round(orderSummary.total * 100),
     currency: 'INR',
     name: 'Fwaeh Mart',
     description: 'Order Payment',
@@ -167,7 +189,6 @@ const handleRazorpayPayment = async () => {
   const razorpay = new window.Razorpay(options);
   razorpay.open();
 };
-
 // Main payment handler
 const handlePayment = async () => {
   setLoading(true);
