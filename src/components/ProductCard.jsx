@@ -1,4 +1,4 @@
-import { ShoppingCart, Store, MapPin } from "lucide-react"
+import { ShoppingCart, Store, MapPin, Clock, HelpCircle } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "../contexts/AuthContext"
 import { calculateDistance, formatDistance } from "../utils/location"
@@ -8,7 +8,7 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
   const { profile } = useAuth()
 
   const handleAddToCart = async (e) => {
-    e.stopPropagation(); // Prevent clicking card when clicking button
+    e.stopPropagation(); 
     if (!product || product.stock_quantity === 0) return;
     
     setIsLoading(true)
@@ -23,7 +23,6 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
 
   if (!product) return null
 
-  // Calculate distance if locations are available
   const sellerData = product.seller || product.profiles;
   
   const distance = (userLocation && sellerData?.location_lat && sellerData?.location_lng)
@@ -37,9 +36,14 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
 
   const isRetailerOrWholesaler = profile?.role === 'retailer' || profile?.role === 'wholesaler'
 
+  // Helper to get display text for restock
+  const getRestockText = () => {
+    if (product.restock_days === -1) return "Availability Uncertain";
+    return `Available in ${product.restock_days} days`;
+  };
+
   return (
     <div className="group bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden border-2" style={{ borderColor: '#E8B4B8' }}>
-      {/* Image Container */}
       <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'linear-gradient(135deg, #FDD9D7 0%, #F5C9C6 100%)' }}>
         <img
           src={product.image_url || "/placeholder.svg"}
@@ -47,7 +51,6 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         />
 
-        {/* Distance Badge */}
         {distance !== null && (
           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-700 px-2 py-1 rounded-lg text-xs font-bold shadow-md flex items-center gap-1">
             <MapPin size={12} className="text-red-500" />
@@ -55,19 +58,31 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
           </div>
         )}
 
-        {/* Category Badge */}
         <div className="absolute top-3 left-3">
           <span className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full text-xs font-bold shadow-md border-2" style={{ color: '#8B4343', borderColor: '#E8B4B8' }}>
             {product.category}
           </span>
         </div>
 
-        {/* Out of Stock Overlay */}
         {product.stock_quantity === 0 && (
-          <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center backdrop-blur-sm">
-            <span className="text-white px-6 py-3 rounded-full font-bold text-lg shadow-lg" style={{ backgroundColor: '#E88B8B' }}>
+          <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center backdrop-blur-sm p-4 text-center">
+            <span className="text-white px-6 py-2 rounded-full font-bold text-lg shadow-lg mb-2" style={{ backgroundColor: '#E88B8B' }}>
               Out of Stock
             </span>
+            
+            {/* 🚀 NEW RESTOCK ALERT */}
+            {product.restock_days && (
+              <div className="flex items-center bg-white/20 backdrop-blur-md px-3 py-1 rounded-lg border border-white/30 animate-pulse">
+                {product.restock_days === -1 ? (
+                   <HelpCircle size={14} className="text-yellow-300 mr-2" />
+                ) : (
+                   <Clock size={14} className="text-yellow-300 mr-2" />
+                )}
+                <span className="text-yellow-100 text-xs font-bold">
+                   {getRestockText()}
+                </span>
+              </div>
+            )}
           </div>
         )}
         
@@ -78,7 +93,6 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
         )}
       </div>
 
-      {/* Product Info */}
       <div className="p-5 space-y-3">
         <h3 className="text-lg font-bold line-clamp-2 min-h-[3.5rem] transition-colors" style={{ color: '#8B4343' }}>
           {product.name}
@@ -97,7 +111,6 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
           </div>
         </div>
 
-        {/* Seller Info */}
         {sellerData && (
           <div className="flex items-center pt-3 border-t-2" style={{ borderColor: '#E8B4B8' }}>
              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md mr-3" style={{ backgroundColor: '#E88B8B' }}>
@@ -113,7 +126,6 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
           </div>
         )}
 
-        {/* Add to Cart Button */}
         {!isRetailerOrWholesaler && (
           <button
             onClick={handleAddToCart}
@@ -128,7 +140,11 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
             {isLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-3 border-white border-t-transparent"></div>
             ) : product.stock_quantity === 0 ? (
-              <span>Out of Stock</span>
+              <span>
+                {product.restock_days 
+                  ? (product.restock_days === -1 ? "Check Back Later" : `Back in ${product.restock_days} Days`)
+                  : "Out of Stock"}
+              </span>
             ) : (
               <>
                 <ShoppingCart size={20} />

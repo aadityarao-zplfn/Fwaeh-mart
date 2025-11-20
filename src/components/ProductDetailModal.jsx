@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Plus, ShoppingCart, Store } from 'lucide-react';
+import { X, Minus, Plus, ShoppingCart, Store, Clock, Calendar, HelpCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -7,14 +7,11 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const { profile: userProfile } = useAuth(); // Renamed to avoid confusion with product seller profile
+  const { profile: userProfile } = useAuth();
 
-  // Helper to safely get seller profile data
   const getSellerProfile = () => {
     if (!product) return null;
-    // Handle both 'profiles' (new) and 'seller' (legacy) keys
     const data = product.profiles || product.seller;
-    // Handle if Supabase returns it as an array
     return Array.isArray(data) ? data[0] : data;
   };
 
@@ -26,11 +23,9 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
     setIsLoading(true);
     try {
       const toastId = toast.loading(`Adding ${quantity} item(s) to cart...`);
-      
       if (onAddToCart) {
         await onAddToCart(product.id, quantity);
       }
-      
       toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
       onClose();
     } catch (error) {
@@ -58,6 +53,11 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   if (!product) return null;
 
   const isRetailerOrWholesaler = userProfile?.role === 'retailer' || userProfile?.role === 'wholesaler';
+  
+  // Helper for display text
+  const restockText = product.restock_days === -1 
+    ? "Availability Uncertain" 
+    : `Restocking in ${product.restock_days} days`;
 
   return (
     <>
@@ -163,7 +163,17 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                     {product.stock_quantity} units in stock
                   </span>
                 ) : (
-                  <span className="font-bold" style={{ color: '#ff5757' }}>Out of Stock</span>
+                  <div className="text-right">
+                    <span className="block font-bold text-red-500">Out of Stock</span>
+                    
+                    {/* 🚀 NEW RESTOCK ALERT */}
+                    {product.restock_days && (
+                      <span className="flex items-center justify-end gap-1 text-sm font-bold text-orange-600 mt-1">
+                        {product.restock_days === -1 ? <HelpCircle size={14} /> : <Clock size={14} />}
+                        {restockText}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -219,7 +229,16 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                     Adding...
                   </>
                 ) : product.stock_quantity === 0 ? (
-                  'Out of Stock'
+                  // 🚀 Customized Button Text
+                   product.restock_days ? (
+                    <span className="flex items-center">
+                      {product.restock_days === -1 ? (
+                          <> <HelpCircle className="mr-2" /> Check Back Later </>
+                      ) : (
+                          <> <Calendar className="mr-2" /> Available in {product.restock_days} Days </>
+                      )}
+                    </span>
+                  ) : 'Out of Stock'
                 ) : (
                   <>
                     <ShoppingCart size={24} className="mr-2" />
@@ -230,7 +249,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
             )}
           </div>
 
-          {/* Seller Information Card - FIXED */}
+          {/* Seller Information Card */}
           <div 
             className="rounded-2xl p-6 shadow-lg border-2"
             style={{ background: 'linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%)', borderColor: '#fca5a5' }}

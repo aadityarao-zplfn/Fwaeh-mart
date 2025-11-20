@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadProductImage } from '../utils/uploadImage';
 import { setStock } from '../utils/inventory';
-import { X, Upload, Plus, Edit, Save, Eye } from 'lucide-react';
+import { X, Upload, Plus, Edit, Save, Eye, Clock, HelpCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ProductManagement = () => {
@@ -18,13 +18,16 @@ const ProductManagement = () => {
   const [hoveredImage, setHoveredImage] = useState(null);
   const { user } = useAuth();
 
+  // Added restock_uncertain to state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     price: '',
     stock_quantity: '',
     category: '',
-    image_url: ''
+    image_url: '',
+    restock_days: '',
+    restock_uncertain: false 
   });
 
   useEffect(() => {
@@ -71,7 +74,7 @@ const ProductManagement = () => {
       } else if (action === 'activate' || action === 'deactivate') {
         const { error } = await supabase
           .from('products')
-          .update({ active: action === 'activate' })
+          .update({ is_active: action === 'activate' })
           .in('id', productIds);
 
         if (error) throw error;
@@ -123,13 +126,22 @@ const ProductManagement = () => {
   const saveQuickEdit = async (productId) => {
     try {
       const toastId = toast.loading('Updating product...');
+      const newStock = parseInt(quickEditData.stock_quantity);
+      
+      const updatePayload = {
+        name: quickEditData.name,
+        price: parseFloat(quickEditData.price),
+        stock_quantity: newStock
+      };
+
+      // If stock added via quick edit, clear alert automatically
+      if (newStock > 0) {
+        updatePayload.restock_days = null;
+      }
+
       const { error } = await supabase
         .from('products')
-        .update({
-          name: quickEditData.name,
-          price: parseFloat(quickEditData.price),
-          stock_quantity: parseInt(quickEditData.stock_quantity)
-        })
+        .update(updatePayload)
         .eq('id', productId);
 
       if (error) throw error;
@@ -191,45 +203,51 @@ const ProductManagement = () => {
     try {
       const toastId = toast.loading(editingProduct ? 'Updating product...' : 'Adding product...');
       
-      if (editingProduct) {
-        console.log('🔄 Attempting stock update...');
-        
-        // ✅ FIX: Add timeout to prevent hanging
-        try {
-          const stockPromise = setStock(
-            editingProduct.id, 
-            parseInt(formData.stock_quantity)
-          );
-          
-          // 5-second timeout for Edge Function
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Edge Function timeout after 5 seconds')), 5000)
-          );
-          
-          const stockResult = await Promise.race([stockPromise, timeoutPromise]);
-          
-          if (stockResult.error) {
-            console.log('❌ Edge Function failed, using direct update instead');
-            // Fallback to direct update
-            await updateProductDirectly();
-          } else {
-            console.log('✅ Edge Function success:', stockResult);
-            // Update other fields except stock
-            await updateProductWithoutStock();
-          }
-        } catch (timeoutError) {
-          console.log('⏰ Edge Function timeout, using direct update');
-          await updateProductDirectly();
+      const stockQty = parseInt(formData.stock_quantity);
+      
+      // Determine restock_days value
+      let restockValue = null;
+      if (stockQty === 0) {
+        if (formData.restock_uncertain) {
+          restockValue = -1; // -1 indicates "Unsure"
+        } else if (formData.restock_days) {
+          restockValue = parseInt(formData.restock_days);
         }
-        
+      }
+
+      const productPayload = {
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        stock_quantity: stockQty,
+        category: formData.category,
+        image_url: formData.image_url,
+        restock_days: restockValue,
+        updated_at: new Date().toISOString()
+      };
+
+      if (editingProduct) {
+        const { error } = await supabase
+          .from('products')
+          .update(productPayload)
+          .eq('id', editingProduct.id);
+
+        if (error) throw error;
         toast.success('Product updated successfully!', { id: toastId });
+
       } else {
-        // New product - direct insert
-        await createNewProduct();
+        const { error } = await supabase
+          .from('products')
+          .insert([{
+            ...productPayload,
+            seller_id: user.id,
+            created_at: new Date().toISOString()
+          }]);
+
+        if (error) throw error;
         toast.success('Product added successfully!', { id: toastId });
       }
 
-      // Success handling
       resetFormAndRefresh();
       
     } catch (error) {
@@ -240,56 +258,11 @@ const ProductManagement = () => {
     }
   };
 
-  // ✅ Helper functions for better organization
-  const updateProductDirectly = async () => {
-    const { error } = await supabase
-      .from('products')
-      .update({
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity),
-        category: formData.category,
-        image_url: formData.image_url,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', editingProduct.id);
-
-    if (error) throw error;
-  };
-
-  const updateProductWithoutStock = async () => {
-    const { error } = await supabase
-      .from('products')
-      .update({
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        category: formData.category,
-        image_url: formData.image_url,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', editingProduct.id);
-
-    if (error) throw error;
-  };
-
-  const createNewProduct = async () => {
-    const { error } = await supabase
-      .from('products')
-      .insert([{
-        ...formData,
-        seller_id: user.id,
-        price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity),
-        created_at: new Date().toISOString()
-      }]);
-
-    if (error) throw error;
-  };
-
   const resetFormAndRefresh = () => {
-    setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
+    setFormData({ 
+      name: '', description: '', price: '', stock_quantity: '', 
+      category: '', image_url: '', restock_days: '', restock_uncertain: false 
+    });
     setShowForm(false);
     setEditingProduct(null);
     fetchProducts();
@@ -297,13 +270,19 @@ const ProductManagement = () => {
 
   const handleEdit = (product) => {
     setEditingProduct(product);
+    
+    // Handle logic for "Unsure" state (-1)
+    const isUnsure = product.restock_days === -1;
+    
     setFormData({
       name: product.name,
       description: product.description || '',
       price: product.price.toString(),
       stock_quantity: product.stock_quantity.toString(),
       category: product.category || '',
-      image_url: product.image_url || ''
+      image_url: product.image_url || '',
+      restock_days: isUnsure ? '' : (product.restock_days || ''),
+      restock_uncertain: isUnsure
     });
     setShowForm(true);
   };
@@ -328,10 +307,21 @@ const ProductManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '', price: '', stock_quantity: '', category: '', image_url: '' });
+    setFormData({ 
+      name: '', description: '', price: '', stock_quantity: '', 
+      category: '', image_url: '', restock_days: '', restock_uncertain: false 
+    });
     setShowForm(false);
     setEditingProduct(null);
     toast('Form cancelled');
+  };
+
+  // Helper to determine visibility of restock fields
+  const showRestockField = () => {
+    const isStockZero = parseInt(formData.stock_quantity) === 0;
+    // Only for own products, not proxies
+    const isProxy = editingProduct?.is_proxy === true;
+    return isStockZero && !isProxy;
   };
 
   if (loading) {
@@ -448,14 +438,6 @@ const ProductManagement = () => {
                 <p className="text-xs text-red-600 mt-2 text-center">
                   PNG, JPG, WebP up to 5MB
                 </p>
-                
-                {formData.image_url && (
-                  <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
-                    <p className="text-xs text-green-700 text-center">
-                      ✅ Image uploaded successfully!
-                    </p>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -522,6 +504,59 @@ const ProductManagement = () => {
                 </div>
               </div>
 
+              {/* 🚀 RESTOCK ALERT SECTION */}
+              {showRestockField() && (
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 animate-fade-in">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock className="text-orange-500" size={18} />
+                    <label className="block text-sm font-bold text-orange-800">
+                      Restock Estimation (Alert)
+                    </label>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {/* Option 1: Specific Days */}
+                    <div className={`transition-all ${formData.restock_uncertain ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <p className="text-xs text-orange-700 mb-1 font-medium">Estimated days until available:</p>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.restock_days}
+                          onChange={(e) => setFormData({ ...formData, restock_days: e.target.value })}
+                          placeholder="e.g., 5"
+                          className="w-full pl-4 pr-12 py-2 rounded-lg border border-orange-300 focus:ring-2 focus:ring-orange-200 outline-none"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">
+                          Days
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center text-xs text-orange-400 font-bold">
+                      - OR -
+                    </div>
+
+                    {/* Option 2: Unsure */}
+                    <label className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-orange-100 transition-colors">
+                      <input 
+                        type="checkbox"
+                        checked={formData.restock_uncertain}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          restock_uncertain: e.target.checked,
+                          restock_days: e.target.checked ? '' : formData.restock_days 
+                        })}
+                        className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-orange-800 font-medium">
+                        I'm unsure when it will be back
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-semibold mb-2" style={{ color: '#b91c1c' }}>
                   Category
@@ -540,11 +575,6 @@ const ProductManagement = () => {
                 <p className="text-xs text-red-600">
                   <span className="text-red-500">*</span> Required fields
                 </p>
-                {editingProduct && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    🔄 Will try Edge Function first (5s timeout), then fallback to direct update
-                  </p>
-                )}
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -597,16 +627,34 @@ const ProductManagement = () => {
                   alt={product.name}
                   className="w-full h-48 object-cover transition-transform duration-300"
                 />
-                {/* Proxy Badge - ADD THIS */}
+                
+                {/* Proxy Badge */}
                 {product.is_proxy && (
-                  <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                  <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full z-10">
                     Proxy Product
                   </div>
+                )}
+
+                {/* 🚀 Restock Alert Badge (For Seller View) */}
+                {product.stock_quantity === 0 && product.restock_days && (
+                   <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full z-10 font-bold flex items-center gap-1">
+                     {product.restock_days === -1 ? (
+                       <>
+                         <HelpCircle size={12} />
+                         <span>Unsure Restock</span>
+                       </>
+                     ) : (
+                       <>
+                         <Clock size={12} />
+                         <span>In {product.restock_days} days</span>
+                       </>
+                     )}
+                   </div>
                 )}
         
                 {/* Image preview overlay */}
                 {hoveredImage === product.id && (
-                  <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center z-20">
                     <div className="text-center text-white p-4">
                       <Eye size={32} className="mx-auto mb-2" />
                       <p className="text-sm">Click Edit to change image</p>
@@ -615,7 +663,7 @@ const ProductManagement = () => {
                 )}
 
                 {/* Selection checkbox */}
-                <div className="absolute top-2 left-2">
+                <div className="absolute top-2 left-2 z-20">
                   <input
                     type="checkbox"
                     checked={selectedProducts.has(product.id)}
@@ -676,22 +724,6 @@ const ProductManagement = () => {
                     </div>
                   </>
                 )}
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-                  <div className="bg-blue-100 p-2 rounded">
-                    <p className="text-xs text-gray-600">Views</p>
-                    <p className="font-bold text-blue-600">0</p>
-                  </div>
-                  <div className="bg-green-100 p-2 rounded">
-                    <p className="text-xs text-gray-600">Sold</p>
-                    <p className="font-bold text-green-600">0</p>
-                  </div>
-                  <div className="bg-rose-200 p-2 rounded">
-                    <p className="text-xs text-gray-600">Rating</p>
-                    <p className="font-bold text-rose-600">⭐ 0</p>
-                  </div>
-                </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">

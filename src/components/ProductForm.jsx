@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { uploadProductImage } from '../utils/uploadImage';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast'; 
+import { Clock, AlertCircle, Upload, HelpCircle } from 'lucide-react';
 
 const ProductForm = ({ product, onClose }) => {
   const [formData, setFormData] = useState({
@@ -13,6 +14,8 @@ const ProductForm = ({ product, onClose }) => {
     stock_quantity: '',
     image_url: '',
     is_public: true,
+    restock_days: '',
+    restock_uncertain: false 
   });
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -22,6 +25,9 @@ const ProductForm = ({ product, onClose }) => {
   // 1. Load data for editing
   useEffect(() => {
     if (product) {
+      // Handle logic for "Unsure" state (-1)
+      const isUnsure = product.restock_days === -1;
+      
       setFormData({
         name: product.name,
         description: product.description || '',
@@ -30,6 +36,8 @@ const ProductForm = ({ product, onClose }) => {
         stock_quantity: product.stock_quantity,
         image_url: product.image_url || '',
         is_public: product.is_public ?? true,
+        restock_days: isUnsure ? '' : (product.restock_days || ''),
+        restock_uncertain: isUnsure
       });
       if (product.image_url) {
         setImagePreview(product.image_url);
@@ -46,11 +54,12 @@ const ProductForm = ({ product, onClose }) => {
     }));
   };
 
-  // 3. Handle image upload to Supabase Storage
+  // 3. Handle image upload
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Preview immediately
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result);
@@ -70,7 +79,7 @@ const ProductForm = ({ product, onClose }) => {
     }
   };
 
-  // 4. Handle form submission (Add/Edit)
+  // 4. Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user || !profile) {
@@ -81,13 +90,31 @@ const ProductForm = ({ product, onClose }) => {
     setLoading(true);
 
     try {
+      const stockQty = parseInt(formData.stock_quantity);
+      
+      // Determine restock_days value logic
+      let restockValue = null;
+      
+      // Only save restock info if stock is 0
+      if (stockQty === 0) {
+        if (formData.restock_uncertain) {
+          restockValue = -1; // -1 indicates "Unsure"
+        } else if (formData.restock_days) {
+          restockValue = parseInt(formData.restock_days);
+        }
+      }
+
       const payload = {
         ...formData,
         price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity),
+        stock_quantity: stockQty,
+        restock_days: restockValue,
         is_public: formData.is_public,
         updated_at: new Date().toISOString(),
       };
+
+      // Remove temporary frontend-only field before sending
+      delete payload.restock_uncertain;
 
       if (product) {
         const { error } = await supabase.from('products').update(payload).eq('id', product.id);
@@ -114,9 +141,8 @@ const ProductForm = ({ product, onClose }) => {
     }
   };
   
-  // 5. Handle form cancellation
+  // 5. Reset Form
   const resetForm = () => {
-    // Reset form data only if user cancels, otherwise keep changes for context
     setFormData({ 
       name: product?.name || '', 
       description: product?.description || '', 
@@ -124,13 +150,27 @@ const ProductForm = ({ product, onClose }) => {
       category: product?.category || '', 
       stock_quantity: product?.stock_quantity || '', 
       image_url: product?.image_url || '', 
-      is_public: product?.is_public ?? true
+      is_public: product?.is_public ?? true,
+      restock_days: product?.restock_days || '',
+      restock_uncertain: false
     });
     onClose(); 
     toast('Form cancelled'); 
   };
-  
-  // 6. RENDER GUARD: Show loader while profile is loading
+
+  // Helper: Determine if Restock Field should be visible
+  const shouldShowRestockField = () => {
+    const stock = parseInt(formData.stock_quantity);
+    // 1. Stock must be zero
+    const isZeroStock = !stock || stock === 0;
+    
+    // 2. Must NOT be a proxy product
+    // If product exists (editing), check is_proxy. If new, is_proxy is undefined (false).
+    const isProxyProduct = product?.is_proxy === true;
+
+    return isZeroStock && !isProxyProduct;
+  };
+
   if (!profile) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -142,8 +182,6 @@ const ProductForm = ({ product, onClose }) => {
     );
   }
 
-
-  // 7. RENDERED JSX
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -178,9 +216,7 @@ const ProductForm = ({ product, onClose }) => {
                     />
                   ) : (
                     <div className="text-center text-gray-400">
-                      <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
+                      <Upload className="mx-auto h-12 w-12 mb-2" />
                       <p className="text-sm">No image selected</p>
                     </div>
                   )}
@@ -198,19 +234,50 @@ const ProductForm = ({ product, onClose }) => {
                   Choose Product Image
                 </div>
               </label>
-              </div>
-              {/* --- END IMAGE UPLOAD --- */}
+            </div>
               
-              {/* --- PRODUCT FIELDS --- */}
+            {/* --- PRODUCT FIELDS --- */}
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">
+                Product Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter product name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">
+                Description
+              </label>
+              <textarea
+                placeholder="Describe your product (optional)"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
+                rows="3"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-700">
-                  Product Name <span className="text-red-500">*</span>
+                  Price ($) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="text"
-                  placeholder="Enter product name"
-                  name="name"
-                  value={formData.name}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  name="price"
+                  value={formData.price}
                   onChange={handleChange}
                   className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
                   required
@@ -219,68 +286,89 @@ const ProductForm = ({ product, onClose }) => {
 
               <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-700">
-                  Description
-                </label>
-                <textarea
-                  placeholder="Describe your product (optional)"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
-                  rows="3"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
-                    Price ($) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
-                    Stock <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    name="stock_quantity"
-                    value={formData.stock_quantity}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-700">
-                  Category
+                  Stock <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="text"
-                  placeholder="e.g., Electronics, Clothing (optional)"
-                  name="category"
-                  value={formData.category}
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  name="stock_quantity"
+                  value={formData.stock_quantity}
                   onChange={handleChange}
                   className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
+                  required
                 />
               </div>
+            </div>
 
-            {/* 🚀 Wholesaler Public/Private Toggle */}
+            {/* 🚀 NEW RESTOCK ALERT SECTION */}
+            {shouldShowRestockField() && (
+              <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 animate-fade-in">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="text-orange-500" size={18} />
+                  <label className="block text-sm font-bold text-orange-800">
+                    Restock Estimation (Alert)
+                  </label>
+                </div>
+                <p className="text-xs text-orange-600 mb-3">
+                  Since stock is 0, you can set an alert for customers.
+                </p>
+                
+                <div className="space-y-3">
+                  {/* Input for Days */}
+                  <div className={`transition-all ${formData.restock_uncertain ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          name="restock_days"
+                          value={formData.restock_days}
+                          onChange={handleChange}
+                          placeholder="e.g., 5"
+                          className="w-full pl-4 pr-12 py-2 rounded-lg border border-orange-300 focus:ring-2 focus:ring-orange-200 outline-none"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">
+                            Days
+                        </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-center text-xs text-orange-400 font-bold">
+                    - OR -
+                  </div>
+
+                  {/* Checkbox for Unsure */}
+                  <label className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-orange-100 transition-colors">
+                    <input 
+                      type="checkbox"
+                      name="restock_uncertain"
+                      checked={formData.restock_uncertain}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    />
+                    <span className="text-sm text-orange-800 font-medium">
+                      I'm unsure when it will be back
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">
+                Category
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., Electronics, Clothing (optional)"
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-xl border-2 outline-none border-gray-300 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Wholesaler Public/Private Toggle */}
             {profile.role === 'wholesaler' && (
               <div className="pt-4 flex items-center justify-between border-t border-gray-200">
                 <label htmlFor="is_public" className="text-sm font-medium text-gray-700">
