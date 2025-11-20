@@ -1,4 +1,4 @@
-import { trackProductView, trackProductClick, trackCartAdd } from '../utils/analytics.jsx';
+//import { trackProductView, trackProductClick, trackCartAdd } from '../utils/analytics.jsx';
 import { useState, useEffect } from 'react';
 import { X, Minus, Plus, ShoppingCart, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -11,7 +11,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const { profile } = useAuth(); // Get profile info (contains role)
 
   // Track product view when modal opens
-  useEffect(() => {
+  /*useEffect(() => {
     if (product?.id) {
       trackProductView(product.id);
     }
@@ -22,7 +22,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
     if (product?.id) {
       trackProductClick(product.id);
     }
-  }, [product?.id]);
+  }, [product?.id]);*/
 
   const handleAddToCart = async () => {
     if (!product || product.stock_quantity === 0) return;
@@ -34,7 +34,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
       // Call onAddToCart once with the quantity instead of looping
       if (onAddToCart) {
         await onAddToCart(product.id, quantity); // Pass quantity here
-        trackCartAdd(product.id, quantity); // Track with quantity
+        //trackCartAdd(product.id, quantity); // Track with quantity
       }
       
       toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
