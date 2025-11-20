@@ -26,32 +26,74 @@ export const AuthProvider = ({ children }) => {
 
     console.log('🚀 Initializing auth...');
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('👤 Initial session:', session?.user?.id);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
+    const initAuth = async () => {
+      try {
+        console.log('🔍 Checking session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('❌ Session error:', error);
+          // Clear potentially corrupted session
+          await supabase.auth.signOut();
+          localStorage.clear();
+          sessionStorage.clear();
+          setLoading(false);
+          return;
+        }
+
+        console.log('👤 Session found:', session?.user?.id);
+        
+        if (session) {
+          // Validate the token is still good
+          console.log('🔐 Validating user token...');
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          
+          if (userError || !user) {
+            console.error('❌ Token invalid:', userError);
+            await supabase.auth.signOut();
+            localStorage.clear();
+            sessionStorage.clear();
+            setLoading(false);
+            return;
+          }
+          
+          console.log('✅ Token valid, setting user');
+          setUser(user);
+          await fetchProfile(user.id);
+        } else {
+          console.log('👤 No session found');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('❌ Auth initialization error:', error);
         setLoading(false);
       }
-    });
+    };
+
+    initAuth();
 
     // Listen for auth changes - SIMPLIFIED
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔑 Auth event:', event);
         
-        // Only process meaningful events
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        // Clear errors on new auth events
+        setError(null);
+        
+        if (event === 'SIGNED_IN') {
+          console.log('✅ SIGNED_IN event, setting user');
+          setUser(session.user);
+          await fetchProfile(session.user.id);
+        } else if (event === 'SIGNED_OUT') {
+          console.log('🚪 SIGNED_OUT event, clearing everything');
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        } else if (event === 'USER_UPDATED') {
+          console.log('🔄 USER_UPDATED event');
           setUser(session?.user ?? null);
-          
           if (session?.user) {
             await fetchProfile(session.user.id);
-          } else {
-            setProfile(null);
-            setLoading(false);
           }
         }
       }
@@ -126,6 +168,9 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (email, password) => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('🔐 Attempting sign in...');
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -134,6 +179,7 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
 
       if (data.user) {
+        console.log('✅ Sign in successful, checking OTP...');
         const isVerified = await isUserOTPVerified(data.user.id);
         if (!isVerified) {
           throw new Error('Please complete OTP verification before signing in.');
@@ -143,6 +189,8 @@ export const AuthProvider = ({ children }) => {
 
       return { data, error: null };
     } catch (error) {
+      console.error('❌ Sign in error:', error);
+      setError(error.message);
       setLoading(false);
       return { data: null, error };
     }
@@ -150,12 +198,32 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      console.log('🚪 Starting sign out process...');
+      
+      // Clear ALL storage first (nuclear option)
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      console.log('🗑️ Storage cleared, signing out from Supabase...');
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear all state
       setUser(null);
       setProfile(null);
       setLoading(false);
+      setError(null);
+      
+      console.log('✅ Sign out successful, forcing page reload...');
+      // Force hard navigation to clear all React state
+      window.location.href = '/';
+      
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Error signing out:', error);
+      // Still force clear everything and reload
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/';
     }
   };
 
