@@ -13,9 +13,17 @@ export default defineConfig({
     outDir: 'dist',
     ssr: false,
     minify: 'esbuild',
-    emptyOutDir: true
+    emptyOutDir: true,
+    // ADD THIS FOR CACHE BUSTING
+    rollupOptions: {
+      output: {
+        entryFileNames: `[name].[hash].js`,
+        chunkFileNames: `[name].[hash].js`,
+        assetFileNames: `[name].[hash].[ext]`
+      }
+    }
   },
-  base: '/', // KEEP THIS AS '/'
+  base: '/',
   optimizeDeps: {
     include: ['react', 'react-dom', 'lucide-react']
   }
