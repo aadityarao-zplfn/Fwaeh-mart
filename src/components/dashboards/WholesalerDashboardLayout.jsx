@@ -10,9 +10,11 @@ const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { path: '/dashboard/retailers', label: 'Retailers Network', icon: Users },
   { path: '/dashboard/transactions', label: 'Transactions with retailers', icon: CreditCard },
+  { path: '/dashboard/shipping', label: 'Shipping Status', icon: TruckIcon },
  // { path: '/dashboard/products', label: 'Bulk Products', icon: Package },
   //{ path: '/dashboard/orders', label: 'Bulk Orders', icon: TruckIcon },
   { path: '/wholesaler/settings', label: 'Shop Settings', icon: Settings },
+
 ];
 
   const isActive = (path) => location.pathname === path;

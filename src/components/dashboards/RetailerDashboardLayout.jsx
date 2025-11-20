@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, BarChart3, CreditCard, Users, HelpCircle, Settings, MessageSquare, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, BarChart3, CreditCard, Users, HelpCircle, TruckIcon, Settings, MessageSquare, Menu, X } from 'lucide-react';
 
 const RetailerDashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -10,6 +10,7 @@ const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { path: '/dashboard/payments', label: 'Payments pending', icon: CreditCard },
   { path: '/dashboard/orders', label: 'Customer Orders', icon: ShoppingBag },
+  { path: '/dashboard/shipping', label: 'Shipping Status', icon: TruckIcon },
   { path: '/dashboard/queries', label: 'Queries', icon: HelpCircle },
   { path: '/dashboard/settings', label: 'Shop Settings', icon: Settings },
 ];
