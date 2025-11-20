@@ -13,13 +13,17 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [priceRange, setPriceRange] = useState([0, 10000]);
+  // ✅ CHANGE 1: Set default max price very high to avoid filtering
+  const [priceRange, setPriceRange] = useState([0, 1000000]); 
   const [showInStock, setShowInStock] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [minRating, setMinRating] = useState(0);
-  const [maxDistance, setMaxDistance] = useState(50);
+  
+  // ✅ CHANGE 2: Set default distance to 100 (Unlimited) so no products are hidden by default
+  const [maxDistance, setMaxDistance] = useState(100); 
+  
   const [sellerType, setSellerType] = useState('all');
   const [userLocation, setUserLocation] = useState(null);
   const [showMap, setShowMap] = useState(false);
@@ -154,6 +158,7 @@ const Products = () => {
     }
     
     // Distance Filter
+    // Only apply filter if maxDistance is NOT 100 (which means "Unlimited")
     if (userLocation && maxDistance < 100) { 
       filtered = filtered.filter(p => {
         if (!p.seller?.location_lat || !p.seller?.location_lng) return true; 
@@ -243,7 +248,7 @@ const Products = () => {
     setSortBy('newest');
     setShowInStock(false);
     setMinRating(0);
-    setMaxDistance(100);
+    setMaxDistance(100); // Reset to Unlimited
     setSellerType('all');
     setPriceRange([0, maxPrice]);
   };
@@ -253,7 +258,7 @@ const Products = () => {
     showInStock,
     minRating > 0,
     sellerType !== 'all',
-    maxDistance < 100,
+    maxDistance < 100, // Only counts if distance is restricted
     priceRange[0] > 0 || priceRange[1] < maxPrice
   ].filter(Boolean).length;
 
