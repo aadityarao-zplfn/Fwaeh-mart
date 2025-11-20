@@ -13,11 +13,10 @@ import Dashboard from './pages/Dashboard';
 import OrderTracking from './pages/OrderTracking';
 import CustomerDashboardLayout from './components/dashboards/CustomerDashboardLayout';
 import Payment from './pages/Payment';
-import PaymentSuccess from './pages/PaymentSuccess'; // adjust path as needed
-import PaymentFailure from './pages/PaymentFailure'; // adjust path as needed
-import PaymentHistory from './pages/PaymentHistory'; // adjust path as needed
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentFailure from './pages/PaymentFailure';
+import PaymentHistory from './pages/PaymentHistory';
 import Profile from './pages/Profile';
-
 
 function App() {
   return (
@@ -126,15 +125,15 @@ function App() {
               }
             />
             <Route
-  path="/payment-history"
-  element={
-    <ProtectedRoute allowedRoles={['customer']}>
-      <CustomerDashboardLayout>
-        <PaymentHistory />
-      </CustomerDashboardLayout>
-    </ProtectedRoute>
-  }
-/>
+              path="/payment-history"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <PaymentHistory />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

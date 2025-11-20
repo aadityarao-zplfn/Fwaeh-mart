@@ -9,19 +9,21 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // PROPER Vercel configuration
   build: {
     outDir: 'dist',
-    // Ensure SPA mode (not SSR)
     ssr: false,
-    // Better optimization for production
     minify: 'esbuild',
-    // Clear build directory
-    emptyOutDir: true
+    emptyOutDir: true,
+    // ADD THIS FOR CACHE BUSTING
+    rollupOptions: {
+      output: {
+        entryFileNames: `[name].[hash].js`,
+        chunkFileNames: `[name].[hash].js`,
+        assetFileNames: `[name].[hash].[ext]`
+      }
+    }
   },
-  // Explicitly set base path for assets
   base: '/',
-  // Optimize dependencies
   optimizeDeps: {
     include: ['react', 'react-dom', 'lucide-react']
   }

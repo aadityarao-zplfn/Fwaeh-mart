@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase'; // Accesses src/lib/supabase
-import { useAuth } from '../contexts/AuthContext'; // Accesses src/contexts/AuthContext
-import ProductCard from '../components/ProductCard'; // Accesses src/components/ProductCard
-import ProductDetailModal from '../components/ProductDetailModal'; // Accesses src/components/ProductDetailModal
-import NearbyShopsMap from '../components/NearbyShopsMap'; // Accesses src/components/NearbyShopsMap
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import ProductCard from '../components/ProductCard';
+import ProductDetailModal from '../components/ProductDetailModal';
+import NearbyShopsMap from '../components/NearbyShopsMap';
 import { Search, SlidersHorizontal, X, ChevronDown, ChevronUp, Star, MapPin, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -39,7 +39,7 @@ const Products = () => {
     fetchProducts();
   }, []);
 
-  // Get user's current location (same as existing logic)
+  // Get user's current location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -78,7 +78,6 @@ const Products = () => {
           // Update the local product state when a change happens
           setProducts((currentProducts) =>
             currentProducts.map((p) =>
-              // Merge the new data (payload.new) into the existing product (p)
               p.id === payload.new.id ? { ...p, ...payload.new } : p
             )
           );
@@ -93,33 +92,33 @@ const Products = () => {
   }, []);
 
   const fetchProducts = async () => {
-  try {
-    let query = supabase
-      .from('products')
-      .select(`
-        *,
-        profiles!seller_id(full_name, role, location_lat, location_lng, location_address)
-      `)
-      .eq('is_active', true)
-      .or('is_public.is.true');
+    try {
+      let query = supabase
+        .from('products')
+        .select(`
+          *,
+          seller:profiles!seller_id(full_name, role, location_lat, location_lng, location_address)
+        `)
+        .eq('is_active', true)
+        .or('is_public.is.true');
 
-    const { data, error } = await query.order('created_at', { ascending: false });
-    
-    if (error) throw error;
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) throw error;
 
-    // Your filtering logic here
-    const filteredData = data.filter(product => 
-      product.profiles?.role === 'retailer' || product.is_public === true
-    );
+      // Your filtering logic here
+      const filteredData = data.filter(product => 
+        product.seller?.role === 'retailer' || product.is_public === true
+      );
 
-    setProducts(filteredData);
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    toast.error('Failed to load products');
-  } finally {
-    setLoading(false);
-  }
-};
+      setProducts(filteredData);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast.error('Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get categories from products
   const categories = useMemo(() => {
@@ -132,7 +131,7 @@ const Products = () => {
     return Math.ceil(Math.max(...products.map(p => parseFloat(p.price || 0))));
   }, [products]);
 
-  // Filter and sort products - MEMOIZED (Same as existing logic)
+  // Filter and sort products - MEMOIZED
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
@@ -161,18 +160,17 @@ const Products = () => {
       filtered = filtered.filter(p => p.stock_quantity > 0);
     }
 
-    // Rating filter (assuming product object has a rating field)
+    // Rating filter
     if (minRating > 0) {
       filtered = filtered.filter((product) => (product.rating || 0) >= minRating);
     }
 
     // Seller type filter
     if (sellerType !== 'all') {
-      filtered = filtered.filter((product) => product.profiles?.role === sellerType);
+      filtered = filtered.filter((product) => product.seller?.role === sellerType);
     }
     
-    // Distance filter logic remains the same (assuming geospatial calculation is elsewhere if needed)
-
+    // Distance filter logic remains the same
 
     // Sort
     switch (sortBy) {
@@ -290,7 +288,7 @@ const Products = () => {
     </div>
   );
 
-  // Loading Skeleton (Same as existing logic)
+  // Loading Skeleton
   const SkeletonCard = () => (
     <div className="rounded-2xl overflow-hidden shadow-lg animate-pulse" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
       <div className="w-full h-48 bg-gradient-to-br from-red-100 to-red-200"></div>
@@ -624,7 +622,7 @@ const Products = () => {
         {showMap && (
           <div className="mb-6">
             <NearbyShopsMap 
-              products={filteredProducts.filter(p => p.profiles?.location_lat)} 
+              products={filteredProducts.filter(p => p.seller?.location_lat)} 
               userLocation={userLocation}
             />
           </div>
