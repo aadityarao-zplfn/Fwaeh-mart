@@ -597,7 +597,13 @@ const ProductManagement = () => {
                   alt={product.name}
                   className="w-full h-48 object-cover transition-transform duration-300"
                 />
-                
+                {/* Proxy Badge - ADD THIS */}
+                {product.is_proxy && (
+                  <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                    Proxy Product
+                  </div>
+                )}
+        
                 {/* Image preview overlay */}
                 {hoveredImage === product.id && (
                   <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center">
