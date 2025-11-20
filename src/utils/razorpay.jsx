@@ -8,7 +8,7 @@ export const loadRazorpay = () => {
   });
 };
 
-export const initiatePayment = async (orderDetails, onSuccess, onFailure) => {
+export const initiatePayment = async (orderDetails, userInfo, onSuccess, onFailure) => {
   const res = await loadRazorpay();
 
   if (!res) {
@@ -22,14 +22,14 @@ export const initiatePayment = async (orderDetails, onSuccess, onFailure) => {
     currency: 'INR',
     name: 'Fwaeh Mart',
     description: 'Order Payment',
-  //  image: '/logo.png', // Your logo
+    image: '/logo.png', // Your logo URL
     handler: function (response) {
       onSuccess(response);
     },
     prefill: {
-      name: orderDetails.userName,
-      email: orderDetails.userEmail,
-      contact: orderDetails.userPhone
+      name: userInfo.fullName,
+      email: userInfo.email,
+      contact: userInfo.phone
     },
     theme: {
       color: '#ff5757'

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { subtractStock } from '../utils/inventory'; // ✅ REQUIRED for secure stock deduction
 import { CreditCard, CheckCircle, Lock, ArrowLeft, MapPin, Phone, Mail, User, Package, Banknote, Smartphone, Shield, Edit2, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -10,7 +9,6 @@ const Checkout = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [placing, setPlacing] = useState(false);
   
   const [shippingInfo, setShippingInfo] = useState({
     fullName: '',
@@ -75,8 +73,8 @@ const Checkout = () => {
 
   const calculateOrderSummary = () => {
     const subtotal = calculateTotal();
-    const tax = subtotal * 0.1; // 10% GST
-    const shipping = subtotal > 500 ? 0 : 50; 
+    const tax = subtotal * 0.1;
+    const shipping = subtotal > 500 ? 0 : 50;
     const total = subtotal + tax + shipping;
     
     return { subtotal, tax, shipping, total };
@@ -121,97 +119,39 @@ const Checkout = () => {
   };
 
   const handlePlaceOrder = async () => {
-    setPlacing(true);
-    const toastId = toast.loading('Processing payment...');
+    if (!validateStep1()) return;
 
-    try {
-      // 1. Simulate Payment Gateway
-      await new Promise(resolve => setTimeout(resolve, 2000));
+    const fullAddress = `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`;
+    const orderSummary = calculateOrderSummary();
 
-      const fullAddress = `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`;
-      const { total } = calculateOrderSummary();
+    const orderData = {
+      user_id: user.id,
+      total_amount: orderSummary.total,
+      shipping_address: fullAddress,
+      payment_method: paymentMethod,
+      contact_phone: shippingInfo.phone,
+      contact_email: shippingInfo.email,
+      contact_name: shippingInfo.fullName,
+    };
 
-      // 2. Create Order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([
-          {
-            user_id: user.id,
-            total_amount: total,
-            shipping_address: fullAddress,
-            status: 'pending',
-            payment_method: paymentMethod,
-            contact_phone: shippingInfo.phone,
-            contact_email: shippingInfo.email,
-            contact_name: shippingInfo.fullName,
-          },
-        ])
-        .select()
-        .single();
+    const orderItemsData = cartItems.map((item) => ({
+      product_id: item.product_id,
+      seller_id: item.products.seller_id,
+      quantity: item.quantity,
+      price_at_purchase: item.products.price,
+    }));
 
-      if (orderError) throw orderError;
-
-      // 3. Create Order Items
-      const orderItems = cartItems.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        seller_id: item.products.seller_id,
-        quantity: item.quantity,
-        price_at_purchase: item.products.price,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // 4. ✅ UPDATE STOCK SECURELY (using Edge Function via subtractStock)
-      for (const item of cartItems) {
-        const result = await subtractStock(item.product_id, item.quantity);
-        
-        if (!result.success) {
-          console.error(`Stock update failed for ${item.products.name}:`, result.error);
-        }
-      }
-
-      // 5. Clear Cart
-      const { error: clearCartError } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (clearCartError) throw clearCartError;
-
-      // 6. Create Notification
-      await supabase.from('notifications').insert([{
-        user_id: user.id,
-        title: 'Order Placed Successfully! 🎉',
-        message: `Order #${order.id.slice(0, 8)} for ₹${total.toFixed(2)} has been confirmed.`,
-        type: 'order',
-        read: false
-      }]);
-
-      // 7. Save Profile Address
-      if (shippingInfo.saveAddress) {
-        await supabase
-          .from('profiles')
-          .update({
-            address: fullAddress,
-            phone: shippingInfo.phone,
-            full_name: shippingInfo.fullName
-          })
-          .eq('id', user.id);
-      }
-
-      toast.success('Order placed successfully!', { id: toastId });
-      navigate('/orders');
-    } catch (error) {
-      console.error('Error placing order:', error);
-      toast.error('Failed to place order: ' + error.message, { id: toastId });
-    } finally {
-      setPlacing(false);
-    }
+    navigate('/payment', { 
+      state: { 
+        orderData,
+        orderItemsData,
+        cartItems,
+        shippingInfo,
+        orderSummary,
+        saveAddress: shippingInfo.saveAddress,
+        fullAddress
+      } 
+    });
   };
 
   if (loading) {
@@ -250,7 +190,6 @@ const Checkout = () => {
           Back to Cart
         </button>
 
-        {/* Progress Indicator */}
         <div className="mb-12">
           <div className="flex items-center justify-center">
             {steps.map((step, index) => {
@@ -301,13 +240,11 @@ const Checkout = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2">
             <div
               className="rounded-3xl p-8 shadow-xl"
               style={{ background: 'rgba(255, 255, 255, 0.8)', border: '2px solid #f8b4b4' }}
             >
-              {/* Step 1: Shipping Information */}
               {currentStep === 1 && (
                 <div>
                   <h2 className="text-3xl font-bold mb-6" style={{ color: '#a94442' }}>
@@ -439,7 +376,6 @@ const Checkout = () => {
                 </div>
               )}
 
-              {/* Step 2: Payment Method */}
               {currentStep === 2 && (
                 <div>
                   <h2 className="text-3xl font-bold mb-6" style={{ color: '#a94442' }}>
@@ -534,7 +470,6 @@ const Checkout = () => {
                 </div>
               )}
 
-              {/* Step 3: Order Review */}
               {currentStep === 3 && (
                 <div>
                   <h2 className="text-3xl font-bold mb-6" style={{ color: '#a94442' }}>
@@ -627,7 +562,6 @@ const Checkout = () => {
                 </div>
               )}
 
-              {/* Navigation Buttons */}
               <div className="flex gap-4 mt-8">
                 {currentStep > 1 && (
                   <button
@@ -651,28 +585,17 @@ const Checkout = () => {
                 ) : (
                   <button
                     onClick={handlePlaceOrder}
-                    disabled={placing}
-                    className="flex-1 py-5 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 py-5 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 text-lg"
                     style={{ background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)' }}
                   >
-                    {placing ? (
-                      <span className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                        Placing Order...
-                      </span>
-                    ) : (
-                      <>
-                        <Lock size={24} />
-                        Place Order - ₹{total.toFixed(2)}
-                      </>
-                    )}
+                    <Lock size={24} />
+                    Place Order - ₹{total.toFixed(2)}
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Order Summary Sidebar */}
           <div className="lg:col-span-1">
             <div
               className="rounded-3xl p-8 sticky top-6 shadow-xl"

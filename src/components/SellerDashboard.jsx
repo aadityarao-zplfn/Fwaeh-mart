@@ -155,7 +155,7 @@ const SellerDashboard = () => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm opacity-90 font-medium">Total Sales</p>
-                  <p className="text-4xl font-bold mt-2">${stats.totalSales.toFixed(2)}</p>
+                  <p className="text-4xl font-bold mt-2">₹{stats.totalSales.toFixed(2)}</p>
                 </div>
               </div>
             </div>
@@ -189,7 +189,7 @@ const SellerDashboard = () => {
                 <div>
                   <p className="text-sm opacity-90 font-medium">Avg. Order Value</p>
                   <p className="text-4xl font-bold mt-2">
-                    ${stats.totalOrders > 0 ? (stats.totalSales / stats.totalOrders).toFixed(2) : '0.00'}
+                    ₹{stats.totalOrders > 0 ? (stats.totalSales / stats.totalOrders).toFixed(2) : '0.00'}
                   </p>
                 </div>
               </div>
@@ -246,7 +246,7 @@ const SellerDashboard = () => {
                           Date: {new Date(order.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ₹{
                         order.status === 'pending' ? 'bg-amber-100 text-amber-800' :
                         order.status === 'processing' ? 'bg-rose-100 text-rose-800' :
                         order.status === 'shipped' ? 'bg-pink-100 text-pink-800' :
@@ -284,7 +284,7 @@ const SellerDashboard = () => {
                             className="text-sm font-semibold"
                             style={{ color: '#ff5757' }}
                           >
-                            ${(parseFloat(item.price_at_purchase) * item.quantity).toFixed(2)}
+                            ₹{(parseFloat(item.price_at_purchase) * item.quantity).toFixed(2)}
                           </p>
                         </div>
                       ))}
