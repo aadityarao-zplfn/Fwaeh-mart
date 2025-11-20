@@ -13,20 +13,10 @@ export default defineConfig({
     outDir: 'dist',
     ssr: false,
     minify: 'esbuild',
-    emptyOutDir: true,
-    // Add this for better SPA handling
-    rollupOptions: {
-      input: './index.html'
-    }
+    emptyOutDir: true
   },
-  // CRITICAL CHANGE: Use './' for proper asset paths in production
-  base: './',
+  base: '/', // KEEP THIS AS '/'
   optimizeDeps: {
     include: ['react', 'react-dom', 'lucide-react']
-  },
-  // Add this for better development experience
-  server: {
-    port: 3000,
-    open: true
   }
 })
