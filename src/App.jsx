@@ -58,7 +58,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/products" element={<Products />} />
-            <Route path="/shops" element={<Shops />} /> {/* ✅ New Route */}
+            <Route path="/shops" element={<Shops />} />
 
             {/* Role Selection */}
             <Route
@@ -70,7 +70,7 @@ function App() {
               }
             />
 
-            {/* Protected Customer Routes */}
+            {/* Customer Routes */}
             <Route
               path="/cart"
               element={
@@ -92,8 +92,6 @@ function App() {
               }
             />
             <Route path="/profile" element={<Profile />} />
-            
-            {/* Order Tracking */}
             <Route
               path="/orders"
               element={
@@ -104,8 +102,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            
-            {/* Payment Routes */}
             <Route
               path="/payment"
               element={
@@ -129,7 +125,7 @@ function App() {
               }
             />
 
-            {/* Dashboard Main Route */}
+            {/* Dashboard */}
             <Route
               path="/dashboard"
               element={
@@ -139,7 +135,7 @@ function App() {
               }
             />
 
-            {/* ✅ Retailer Settings */}
+            {/* Retailer Settings */}
             <Route
               path="/dashboard/settings"
               element={
@@ -151,7 +147,7 @@ function App() {
               }
             />
 
-            {/* ✅ Wholesaler Settings */}
+            {/* Wholesaler Settings */}
              <Route
               path="/wholesaler/settings"
               element={

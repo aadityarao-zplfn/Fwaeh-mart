@@ -100,7 +100,7 @@ const DashboardSettings = () => {
               Shop Location
             </h3>
             <p className="text-sm text-gray-500 mb-4">
-              Click on the map to pin your shop location. This allows customers to find you using distance filters.
+              Pin your shop on the map. This allows customers to find you using distance filters.
             </p>
             
             <LocationPicker 

@@ -41,7 +41,7 @@ const LocationMarker = ({ position, setPosition, setAddress, onLocationSelect })
   );
 };
 
-// Helper to reverse geocode (get address from lat/lng)
+// Helper to reverse geocode (get address from lat/lng) via OpenStreetMap
 const fetchAddress = async (lat, lng, setAddress, onLocationSelect) => {
   try {
     // Notify parent immediately of coords

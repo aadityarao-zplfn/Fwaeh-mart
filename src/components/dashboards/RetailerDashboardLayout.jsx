@@ -8,10 +8,11 @@ const RetailerDashboardLayout = ({ children }) => {
 
   const navItems = [
     { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+    { path: '/dashboard/products', label: 'My Products', icon: Package },
     { path: '/dashboard/orders', label: 'Orders', icon: ShoppingBag },
     { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/dashboard/reviews', label: 'Reviews', icon: MessageSquare },
-    { path: '/dashboard/settings', label: 'Settings', icon: Settings },
+    { path: '/dashboard/settings', label: 'Shop Settings', icon: Settings }, // ✅ UPDATED LABEL
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -40,7 +41,7 @@ const RetailerDashboardLayout = ({ children }) => {
         </button>
       </div>
 
-      {/* Sidebar - Hidden on mobile, slides in when open */}
+      {/* Sidebar */}
       <nav className={`
         fixed lg:static inset-y-0 left-0 z-40
         w-80 lg:w-auto transform transition-transform duration-300 ease-in-out
@@ -53,41 +54,24 @@ const RetailerDashboardLayout = ({ children }) => {
             border: '1px solid rgba(255, 130, 130, 0.3)'
           }}
         >
-          {/* Top Label - Hidden on mobile in sidebar */}
           <div className="text-center mb-6 lg:mb-4">
-            <p 
-              className="text-sm font-semibold tracking-wide uppercase"
-              style={{ color: '#dc2626' }}
-            >
+            <p className="text-sm font-semibold tracking-wide uppercase" style={{ color: '#dc2626' }}>
               Retailer Dashboard
             </p>
           </div>
 
-          {/* Header with Icon - Hidden on mobile in sidebar */}
           <div className="text-center mb-8 lg:mb-6">
-            <div 
-              className="inline-flex items-center justify-center w-16 h-16 lg:w-12 lg:h-12 rounded-full mb-3 shadow-lg"
-              style={{
-                background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)'
-              }}
-            >
+            <div className="inline-flex items-center justify-center w-16 h-16 lg:w-12 lg:h-12 rounded-full mb-3 shadow-lg" style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}>
               <span className="text-2xl lg:text-xl">🏪</span>
             </div>
-            <h1 
-              className="text-2xl lg:text-lg font-bold mb-1"
-              style={{ color: '#b91c1c' }}
-            >
+            <h1 className="text-2xl lg:text-lg font-bold mb-1" style={{ color: '#b91c1c' }}>
               Welcome Back
             </h1>
-            <p 
-              className="text-sm lg:text-xs"
-              style={{ color: '#dc2626' }}
-            >
+            <p className="text-sm lg:text-xs" style={{ color: '#dc2626' }}>
               Manage products and grow business
             </p>
           </div>
 
-          {/* Navigation Links */}
           <div className="space-y-3">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -117,67 +101,13 @@ const RetailerDashboardLayout = ({ children }) => {
 
       {/* Main content */}
       <div className="lg:flex-1 lg:max-w-4xl w-full">
-        {/* Main Card Container */}
-        <div 
-          className="rounded-3xl shadow-2xl p-6 lg:p-8"
-          style={{
-            background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)',
-            border: '1px solid rgba(255, 130, 130, 0.3)'
-          }}
-        >
-          {/* Top Label - Only show on desktop (hidden in mobile sidebar) */}
-          <div className="text-center mb-4 hidden lg:block">
-            <p 
-              className="text-sm font-semibold tracking-wide uppercase"
-              style={{ color: '#dc2626' }}
-            >
-              Retailer Dashboard
-            </p>
-          </div>
-
-          {/* Header with Icon - Only show on desktop (hidden in mobile sidebar) */}
-          <div className="text-center mb-8 hidden lg:block">
-            <div 
-              className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 shadow-lg"
-              style={{
-                background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)'
-              }}
-            >
-              <span className="text-4xl">🏪</span>
-            </div>
-            <h1 
-              className="text-4xl font-bold mb-2"
-              style={{ color: '#b91c1c' }}
-            >
-              Welcome Back
-            </h1>
-            <p 
-              className="text-base"
-              style={{ color: '#dc2626' }}
-            >
-              Manage your products and grow your business
-            </p>
-          </div>
-
-          {/* Main Content Area */}
-          <div 
-            className="rounded-2xl shadow-inner p-6 lg:p-8"
-            style={{
-              background: '#ffffff',
-              border: '2px solid #fca5a5'
-            }}
-          >
-            {children}
-          </div>
+        <div className="rounded-3xl shadow-2xl p-6 lg:p-8" style={{ background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)', border: '1px solid rgba(255, 130, 130, 0.3)' }}>
+          {children}
         </div>
       </div>
 
-      {/* Overlay for mobile when sidebar is open */}
       {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
     </div>
   );

@@ -12,174 +12,42 @@ const WholesalerDashboardLayout = ({ children }) => {
     { path: '/dashboard/orders', label: 'Bulk Orders', icon: TruckIcon },
     { path: '/dashboard/analytics', label: 'Sales Analytics', icon: BarChart3 },
     { path: '/dashboard/retailers', label: 'Retailer Network', icon: Users },
-    { path: '/dashboard/settings', label: 'Settings', icon: Settings },
+    { path: '/wholesaler/settings', label: 'Shop Settings', icon: Settings }, // ✅ CORRECT LINK & LABEL
   ];
 
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div 
-      className="min-h-screen lg:flex lg:items-center lg:justify-center p-4"
-      style={{
-        background: 'linear-gradient(135deg, #ffd4d4 0%, #ffb8be 50%, #ff9aa2 100%)'
-      }}
-    >
-      {/* Mobile menu button */}
+    <div className="min-h-screen lg:flex lg:items-center lg:justify-center p-4" style={{ background: 'linear-gradient(135deg, #ffd4d4 0%, #ffb8be 50%, #ff9aa2 100%)' }}>
       <div className="lg:hidden fixed top-6 right-6 z-50">
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-3 rounded-xl shadow-lg transition-all hover:scale-110"
-          style={{
-            background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)'
-          }}
-        >
-          {sidebarOpen ? (
-            <X size={24} className="text-white" />
-          ) : (
-            <Menu size={24} className="text-white" />
-          )}
+        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-3 rounded-xl shadow-lg transition-all hover:scale-110" style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}>
+          {sidebarOpen ? <X size={24} className="text-white" /> : <Menu size={24} className="text-white" />}
         </button>
       </div>
 
-      {/* Sidebar - Hidden on mobile, slides in when open */}
-      <nav className={`
-        fixed lg:static inset-y-0 left-0 z-40
-        w-80 lg:w-auto transform transition-transform duration-300 ease-in-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <div 
-          className="h-full lg:h-auto rounded-3xl lg:rounded-2xl shadow-2xl lg:shadow-lg p-8 lg:p-6 m-4 lg:m-0"
-          style={{
-            background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)',
-            border: '1px solid rgba(255, 130, 130, 0.3)'
-          }}
-        >
-          {/* Top Label - Hidden on mobile in sidebar */}
-          <div className="text-center mb-6 lg:mb-4">
-            <p 
-              className="text-sm font-semibold tracking-wide uppercase"
-              style={{ color: '#dc2626' }}
-            >
-              Wholesaler Dashboard
-            </p>
-          </div>
-
-          {/* Header with Icon - Hidden on mobile in sidebar */}
+      <nav className={`fixed lg:static inset-y-0 left-0 z-40 w-80 lg:w-auto transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="h-full lg:h-auto rounded-3xl lg:rounded-2xl shadow-2xl lg:shadow-lg p-8 lg:p-6 m-4 lg:m-0" style={{ background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)', border: '1px solid rgba(255, 130, 130, 0.3)' }}>
           <div className="text-center mb-8 lg:mb-6">
-            <div 
-              className="inline-flex items-center justify-center w-16 h-16 lg:w-12 lg:h-12 rounded-full mb-3 shadow-lg"
-              style={{
-                background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)'
-              }}
-            >
-              <span className="text-2xl lg:text-xl">🏭</span>
-            </div>
-            <h1 
-              className="text-2xl lg:text-lg font-bold mb-1"
-              style={{ color: '#b91c1c' }}
-            >
-              Welcome Back
-            </h1>
-            <p 
-              className="text-sm lg:text-xs"
-              style={{ color: '#dc2626' }}
-            >
-              Manage bulk inventory and retailers
-            </p>
+            <div className="inline-flex items-center justify-center w-16 h-16 lg:w-12 lg:h-12 rounded-full mb-3 shadow-lg" style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}><span className="text-2xl lg:text-xl">🏭</span></div>
+            <h1 className="text-2xl lg:text-lg font-bold mb-1" style={{ color: '#b91c1c' }}>Wholesaler</h1>
           </div>
-
-          {/* Navigation Links */}
           <div className="space-y-3">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setSidebarOpen(false)}
-                  className="flex items-center px-4 py-3 rounded-xl font-medium transition-all shadow-md hover:shadow-lg"
-                  style={{
-                    background: isActive(item.path) 
-                      ? 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)'
-                      : '#fff5f5',
-                    color: isActive(item.path) ? '#ffffff' : '#b91c1c',
-                    border: `2px solid ${isActive(item.path) ? '#ff5757' : '#fca5a5'}`,
-                    transform: isActive(item.path) ? 'scale(1.02)' : 'scale(1)'
-                  }}
-                >
-                  <Icon size={20} className="mr-3" />
-                  <span className="text-lg lg:text-base">{item.label}</span>
+                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className="flex items-center px-4 py-3 rounded-xl font-medium transition-all shadow-md hover:shadow-lg"
+                  style={{ background: isActive(item.path) ? 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' : '#fff5f5', color: isActive(item.path) ? '#ffffff' : '#b91c1c', border: `2px solid ${isActive(item.path) ? '#ff5757' : '#fca5a5'}` }}>
+                  <Icon size={20} className="mr-3" /><span>{item.label}</span>
                 </Link>
               );
             })}
           </div>
         </div>
       </nav>
-
-      {/* Main content */}
       <div className="lg:flex-1 lg:max-w-4xl w-full">
-        {/* Main Card Container */}
-        <div 
-          className="rounded-3xl shadow-2xl p-6 lg:p-8"
-          style={{
-            background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)',
-            border: '1px solid rgba(255, 130, 130, 0.3)'
-          }}
-        >
-          {/* Top Label - Only show on desktop (hidden in mobile sidebar) */}
-          <div className="text-center mb-4 hidden lg:block">
-            <p 
-              className="text-sm font-semibold tracking-wide uppercase"
-              style={{ color: '#dc2626' }}
-            >
-              Wholesaler Dashboard
-            </p>
-          </div>
-
-          {/* Header with Icon - Only show on desktop (hidden in mobile sidebar) */}
-          <div className="text-center mb-8 hidden lg:block">
-            <div 
-              className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 shadow-lg"
-              style={{
-                background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)'
-              }}
-            >
-              <span className="text-4xl">🏭</span>
-            </div>
-            <h1 
-              className="text-4xl font-bold mb-2"
-              style={{ color: '#b91c1c' }}
-            >
-              Welcome Back
-            </h1>
-            <p 
-              className="text-base"
-              style={{ color: '#dc2626' }}
-            >
-              Manage bulk inventory and retailer relationships
-            </p>
-          </div>
-
-          {/* Main Content Area */}
-          <div 
-            className="rounded-2xl shadow-inner p-6 lg:p-8"
-            style={{
-              background: '#ffffff',
-              border: '2px solid #fca5a5'
-            }}
-          >
-            {children}
-          </div>
-        </div>
+        <div className="rounded-2xl shadow-inner p-6 lg:p-8" style={{ background: '#ffffff', border: '2px solid #fca5a5' }}>{children}</div>
       </div>
-
-      {/* Overlay for mobile when sidebar is open */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      {sidebarOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
     </div>
   );
 };
