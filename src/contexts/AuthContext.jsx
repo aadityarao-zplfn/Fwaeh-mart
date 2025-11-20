@@ -104,32 +104,52 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // SIMPLIFIED: Fetch profile without retries or emergency fallbacks
   const fetchProfile = async (userId) => {
     try {
       console.log('📞 Fetching profile for:', userId);
+      console.log('🔍 Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
       
+      // Test basic connection first
+      const { data: testData, error: testError } = await supabase
+        .from('profiles')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Basic profiles query failed:', testError);
+        throw testError;
+      }
+      console.log('✅ Basic profiles query works');
+  
+      // Now try the actual profile fetch
       const { data, error } = await supabase
         .from('profiles')
         .select('id, role, full_name')
         .eq('id', userId)
         .maybeSingle();
-
+  
+      console.log('🔍 Profile fetch result:', { data, error });
+  
       if (error) {
-        console.error('❌ Profile fetch error:', error);
-        return;
+        console.error('❌ Profile fetch error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
       }
       
       if (data) {
         console.log('✅ Profile found:', data);
         setProfile(data);
       } else {
-        console.log('⚠️ No profile found');
-        // Create profile immediately without fallbacks
+        console.log('⚠️ No profile found, creating...');
         await createProfile(userId);
       }
     } catch (error) {
-      console.error('❌ Unexpected error:', error);
+      console.error('💥 Profile fetch completely failed:', error);
+      setError('Failed to load profile: ' + error.message);
     } finally {
       setLoading(false);
     }
