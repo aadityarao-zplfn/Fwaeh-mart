@@ -9,20 +9,24 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // PROPER Vercel configuration
   build: {
     outDir: 'dist',
-    // Ensure SPA mode (not SSR)
     ssr: false,
-    // Better optimization for production
     minify: 'esbuild',
-    // Clear build directory
-    emptyOutDir: true
+    emptyOutDir: true,
+    // Add this for better SPA handling
+    rollupOptions: {
+      input: './index.html'
+    }
   },
-  // Explicitly set base path for assets
-  base: '/',
-  // Optimize dependencies
+  // CRITICAL CHANGE: Use './' for proper asset paths in production
+  base: './',
   optimizeDeps: {
     include: ['react', 'react-dom', 'lucide-react']
+  },
+  // Add this for better development experience
+  server: {
+    port: 3000,
+    open: true
   }
 })
