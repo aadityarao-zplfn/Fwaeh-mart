@@ -1,28 +1,24 @@
-//import { trackProductView, trackProductClick, trackCartAdd } from '../utils/analytics.jsx';
 import { useState, useEffect } from 'react';
 import { X, Minus, Plus, ShoppingCart, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../contexts/AuthContext'; // Add this import
+import { useAuth } from '../contexts/AuthContext';
 
 const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const { profile } = useAuth(); // Get profile info (contains role)
+  const { profile: userProfile } = useAuth(); // Renamed to avoid confusion with product seller profile
 
-  // Track product view when modal opens
-  /*useEffect(() => {
-    if (product?.id) {
-      trackProductView(product.id);
-    }
-  }, [product?.id]);
+  // Helper to safely get seller profile data
+  const getSellerProfile = () => {
+    if (!product) return null;
+    // Handle both 'profiles' (new) and 'seller' (legacy) keys
+    const data = product.profiles || product.seller;
+    // Handle if Supabase returns it as an array
+    return Array.isArray(data) ? data[0] : data;
+  };
 
-  // Track product click when modal opens (user clicked to see details)
-  useEffect(() => {
-    if (product?.id) {
-      trackProductClick(product.id);
-    }
-  }, [product?.id]);*/
+  const seller = getSellerProfile();
 
   const handleAddToCart = async () => {
     if (!product || product.stock_quantity === 0) return;
@@ -31,10 +27,8 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
     try {
       const toastId = toast.loading(`Adding ${quantity} item(s) to cart...`);
       
-      // Call onAddToCart once with the quantity instead of looping
       if (onAddToCart) {
-        await onAddToCart(product.id, quantity); // Pass quantity here
-        //trackCartAdd(product.id, quantity); // Track with quantity
+        await onAddToCart(product.id, quantity);
       }
       
       toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
@@ -59,32 +53,23 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
     }
   };
 
-  // Create image array from product data
-  const productImages = product.image_url ? [product.image_url] : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=800&fit=crop'];
+  const productImages = product?.image_url ? [product.image_url] : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=800&fit=crop'];
 
   if (!product) return null;
 
-  // Check if user is a retailer or wholesaler (both cannot add to cart)
-  const isRetailerOrWholesaler = profile?.role === 'retailer' || profile?.role === 'wholesaler'
-console.log('🔍 DEBUG ProductCard:');
-console.log('Profile:', profile);
-console.log('Profile role:', profile?.role);
-console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
+  const isRetailerOrWholesaler = userProfile?.role === 'retailer' || userProfile?.role === 'wholesaler';
 
   return (
     <>
-      {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
         onClick={onClose}
       ></div>
 
-      {/* Modal - Slides in from right */}
       <div 
         className="fixed top-0 right-0 h-full w-full md:w-[600px] lg:w-[700px] shadow-2xl z-50 overflow-y-auto transform transition-transform duration-300"
         style={{ background: 'linear-gradient(to bottom, #ffe8e8, #fff0f0)' }}
       >
-        {/* Header */}
         <div 
           className="sticky top-0 z-10 px-6 py-4 flex justify-between items-center shadow-md"
           style={{ background: '#fff5f5', borderBottom: '2px solid #fca5a5' }}
@@ -101,11 +86,8 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Image Gallery */}
           <div className="space-y-4">
-            {/* Main Image */}
             <div 
               className="aspect-square rounded-2xl overflow-hidden shadow-lg border-2"
               style={{ borderColor: '#fca5a5' }}
@@ -117,7 +99,6 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
               />
             </div>
 
-            {/* Thumbnails - Only show if multiple images */}
             {productImages.length > 1 && (
               <div className="flex gap-3">
                 {productImages.map((image, index) => (
@@ -142,12 +123,10 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
             )}
           </div>
 
-          {/* Product Info */}
           <div 
             className="rounded-2xl p-6 shadow-lg space-y-4 border-2"
             style={{ background: '#fff5f5', borderColor: '#fca5a5' }}
           >
-            {/* Category Badge */}
             <div>
               <span 
                 className="inline-block px-4 py-2 rounded-full text-xs font-bold border-2"
@@ -157,7 +136,6 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
               </span>
             </div>
 
-            {/* Name and Price */}
             <div>
               <h1 className="text-3xl font-bold mb-3" style={{ color: '#b91c1c' }}>
                 {product.name}
@@ -167,7 +145,6 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
               </p>
             </div>
 
-            {/* Description */}
             <div className="pt-4 border-t-2" style={{ borderColor: '#fca5a5' }}>
               <h3 className="font-bold mb-2" style={{ color: '#b91c1c' }}>Description</h3>
               <p className="leading-relaxed" style={{ color: '#dc2626' }}>
@@ -175,7 +152,6 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
               </p>
             </div>
 
-            {/* Stock Status */}
             <div 
               className="rounded-xl p-4 border-2"
               style={{ background: '#ffffff', borderColor: '#fca5a5' }}
@@ -192,7 +168,6 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
               </div>
             </div>
 
-            {/* Quantity Selector - Hidden for Retailers and Wholesalers */}
             {!isRetailerOrWholesaler && product.stock_quantity > 0 && (
               <div className="pt-4 border-t-2" style={{ borderColor: '#fca5a5' }}>
                 <label className="block font-bold mb-3" style={{ color: '#b91c1c' }}>
@@ -227,7 +202,6 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
               </div>
             )}
 
-            {/* Add to Cart Button - Hidden for Retailers and Wholesalers */}
             {!isRetailerOrWholesaler && (
               <button
                 onClick={handleAddToCart}
@@ -242,7 +216,7 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
                 {isLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent mr-2"></div>
-                    Adding to Cart...
+                    Adding...
                   </>
                 ) : product.stock_quantity === 0 ? (
                   'Out of Stock'
@@ -256,7 +230,7 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
             )}
           </div>
 
-          {/* Seller Information Card */}
+          {/* Seller Information Card - FIXED */}
           <div 
             className="rounded-2xl p-6 shadow-lg border-2"
             style={{ background: 'linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%)', borderColor: '#fca5a5' }}
@@ -273,16 +247,16 @@ console.log('Is retailer or wholesaler?', isRetailerOrWholesaler);
                 className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg"
                 style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
               >
-                {product.profiles?.full_name?.charAt(0).toUpperCase() || 'S'}
+                {seller?.full_name?.charAt(0).toUpperCase() || 'S'}
               </div>
               <div className="flex-1">
                 <p className="text-xl font-bold mb-1" style={{ color: '#b91c1c' }}>
-                  {product.profiles?.full_name || 'Unknown Seller'}
+                  {seller?.full_name || 'Unknown Seller'}
                 </p>
                 <div className="text-sm" style={{ color: '#dc2626' }}>
                   <span className="font-medium">
-                    {product.profiles?.role === 'retailer' ? '🏪 Verified Retailer' : 
-                     product.profiles?.role === 'wholesaler' ? '🏭 Verified Wholesaler' : '👤 Customer Seller'}
+                    {seller?.role === 'retailer' ? '🏪 Verified Retailer' : 
+                     seller?.role === 'wholesaler' ? '🏭 Verified Wholesaler' : '👤 Customer Seller'}
                   </span>
                 </div>
               </div>
