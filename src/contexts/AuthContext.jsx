@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }) => {
       
       // 2. FETCH FROM SUPABASE WITH TIMEOUT
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout after 15s')), 15000)
+        setTimeout(() => reject(new Error('Profile fetch timeout after 15s')), 700)
       );
   
       const fetchPromise = supabase
