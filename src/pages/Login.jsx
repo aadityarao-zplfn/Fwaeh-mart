@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { isUserOTPVerified } from "../utils/otpService"; // 🆕 ADD THIS IMPORT
+import { isUserOTPVerified, markUserAsVerified } from "../utils/otpService"; // ✅ Updated imports
 import { LoadingSpinner, LoadingButton } from "../components/ui/LoadingSpinner";
 
 export default function LoginForm() {
@@ -51,14 +51,26 @@ export default function LoginForm() {
         return;
       }
 
-      // 🆕 CHECK OUR OTP VERIFICATION INSTEAD OF SUPABASE EMAIL CONFIRMATION
+      // ✅ NEW MIGRATION & VERIFICATION LOGIC
       if (data.user) {
-        const isVerified = await isUserOTPVerified(data.user.id);
-        if (!isVerified) {
-          setError('Please complete OTP verification before signing in. Check your email for the verification code.');
-          setIsLoading(false);
-          return;
+        // Check if user is OTP verified
+        // Returns: true (verified), false (unverified), or null (no record)
+        const verificationStatus = await isUserOTPVerified(data.user.id);
+        
+        // Case 1: Legacy User (No verification record found) -> MIGRATE THEM
+        if (verificationStatus === null) {
+            console.log('🛠️ Legacy user detected during login. Migrating to verified status...');
+            await markUserAsVerified(data.user.id);
+            // Continue to login...
+        } 
+        // Case 2: User exists but specifically marked false (Registered but didn't verify)
+        else if (verificationStatus === false) {
+            setError('Please complete OTP verification before signing in. Check your email for the verification code.');
+            setIsLoading(false);
+            // Optional: Trigger resend OTP here if you want
+            return;
         }
+        // Case 3: Status is true -> Allow login
       }
 
       // Success!
@@ -96,6 +108,7 @@ export default function LoginForm() {
         setError(error.message);
         setIsLoading(false);
       }
+      // Note: Google users are auto-verified in AuthContext via onAuthStateChange
     } catch (err) {
       setError('Google sign-in failed. Please try again.');
       setIsLoading(false);

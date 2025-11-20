@@ -259,6 +259,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshProfile = async () => {
+    if (!user) return;
+    console.log('🔄 Forcing profile refresh...');
+    
+    // 1. Invalidate cache
+    const cacheKey = `profile_${user.id}`;
+    localStorage.removeItem(cacheKey);
+    
+    // 2. Fetch fresh data
+    await fetchProfile(user.id);
+  };
+
   const value = {
     user,
     profile,
@@ -266,6 +278,7 @@ export const AuthProvider = ({ children }) => {
     error,
     signIn,
     signOut,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

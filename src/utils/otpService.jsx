@@ -10,6 +10,7 @@ export const generateAndSendOTP = async (email, userId = null) => {
     otpStore.set(email, { otp, expiresAt, userId });
     
     // Create/update verification record if userId provided
+    // Initialize as false for new OTP requests
     if (userId) {
       const { error } = await supabase
         .from('user_verification')
@@ -77,18 +78,15 @@ export const generateAndSendOTP = async (email, userId = null) => {
 export const verifyCustomOTP = async (email, code, userId = null) => {
   try {
     console.log('🔍 Looking for OTP for email:', email);
-    console.log('📦 Current otpStore contents:', Array.from(otpStore.entries()));
     
     const stored = otpStore.get(email);
     
     if (!stored) {
       console.log('❌ OTP not found in store for email:', email);
-      console.log('💡 Possible causes: Hot reload, component re-render, or timing issue');
       return { valid: false, error: 'OTP not found. Please request a new one.' };
     }
     
     console.log('✅ OTP found:', stored);
-    console.log('⏰ Current time:', Date.now(), 'Expires at:', stored.expiresAt);
     
     if (Date.now() > stored.expiresAt) {
       console.log('❌ OTP expired');
@@ -116,17 +114,10 @@ export const verifyCustomOTP = async (email, code, userId = null) => {
     
     // ✅ OTP valid - mark as verified in database
     if (userId) {
-      const { error } = await supabase
-        .from('user_verification')
-        .update({ 
-          otp_verified: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', userId);
+      const success = await markUserAsVerified(userId);
 
-      if (error) {
-        console.error('Error updating verification status:', error);
-        return { valid: false, error: 'Verification failed. Please try again.' };
+      if (!success) {
+        return { valid: false, error: 'Verification database update failed.' };
       }
     }
     
@@ -138,21 +129,44 @@ export const verifyCustomOTP = async (email, code, userId = null) => {
   }
 };
 
+// ✅ NEW HELPER: Force mark a user as verified (Used for Google login & Migration)
+export const markUserAsVerified = async (userId) => {
+  try {
+    const { error } = await supabase
+      .from('user_verification')
+      .upsert({ 
+        user_id: userId,
+        otp_verified: true,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error marking user verified:', error);
+    return false;
+  }
+};
+
 // Check if user is OTP verified
+// Returns: true (verified), false (unverified), or null (no record/migration needed)
 export const isUserOTPVerified = async (userId) => {
   try {
     const { data, error } = await supabase
       .from('user_verification')
       .select('otp_verified')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle to return null if no row exists
     
     if (error) {
       console.error('Error checking OTP verification:', error);
       return false;
     }
     
-    return data?.otp_verified || false;
+    // If no data exists, return null to indicate "Legacy User" status
+    if (!data) return null;
+    
+    return data.otp_verified;
   } catch (error) {
     console.error('Error in isUserOTPVerified:', error);
     return false;

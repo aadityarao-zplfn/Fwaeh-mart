@@ -8,7 +8,7 @@ export default function RoleSelection() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
 
   // 🆕 CRITICAL FIX: Wait for profile to load and redirect if already has role
   useEffect(() => {
@@ -62,6 +62,8 @@ export default function RoleSelection() {
         return;
       }
 
+      await refreshProfile();
+      
       // Redirect to dashboard
       navigate('/dashboard');
     } catch (err) {
