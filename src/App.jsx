@@ -1,84 +1,24 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
-import { useState, useEffect, lazy, Suspense } from 'react';
-
-// Lazy load components with proper error handling
-const Products = lazy(() => import('./pages/Products').catch(err => {
-  console.error('❌ Failed to load Products:', err);
-  return { default: () => <div>❌ Products failed to load: {err.message}</div> };
-}));
-
-const Navbar = lazy(() => import('./components/Navbar').catch(err => {
-  console.error('❌ Failed to load Navbar:', err);
-  return { default: () => <div>❌ Navbar failed to load</div> };
-}));
-
-const Login = lazy(() => import('./pages/Login').catch(err => {
-  console.error('❌ Failed to load Login:', err);
-  return { default: () => <div>❌ Login failed to load</div> };
-}));
-
-// Safe component wrapper
-const SafeComponent = ({ children, name, fallback = null }) => {
-  const [hasError, setHasError] = useState(false);
-  const [error, setError] = useState(null);
-
-  if (hasError) {
-    return (
-      <div style={{ padding: '20px', border: '2px solid red', margin: '10px' }}>
-        <h3>❌ {name} Crashed</h3>
-        <p>{error?.message}</p>
-        <button onClick={() => setHasError(false)}>Retry</button>
-      </div>
-    );
-  }
-
-  try {
-    return (
-      <Suspense fallback={fallback || <div>⏳ Loading {name}...</div>}>
-        {children}
-      </Suspense>
-    );
-  } catch (error) {
-    console.error(`❌ ${name} crashed:`, error);
-    setError(error);
-    setHasError(true);
-    return null;
-  }
-};
-
-// Loading component
-const LoadingSpinner = () => (
-  <div style={{ 
-    padding: '50px', 
-    textAlign: 'center',
-    background: 'linear-gradient(to bottom, #f3d7d7, #f9e5e5)',
-    minHeight: '100vh'
-  }}>
-    <h1 style={{ color: '#a94442' }}>Fwaeh Mart</h1>
-    <p style={{ color: '#cd5c5c' }}>Loading...</p>
-    <div style={{
-      width: '40px',
-      height: '40px',
-      border: '4px solid #f3d7d7',
-      borderTop: '4px solid #e57373',
-      borderRadius: '50%',
-      animation: 'spin 1s linear infinite',
-      margin: '20px auto'
-    }}></div>
-    <style>{`
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    `}</style>
-  </div>
-);
+import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import RoleSelection from './pages/Roleselection';
+import Products from './pages/Products';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
+import Dashboard from './pages/Dashboard';
+import OrderTracking from './pages/OrderTracking';
+import CustomerDashboardLayout from './components/dashboards/CustomerDashboardLayout';
+import Payment from './pages/Payment';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentFailure from './pages/PaymentFailure';
+import PaymentHistory from './pages/PaymentHistory';
+import Profile from './pages/Profile';
 
 function App() {
-  console.log('🚀 APP.JSX RENDERED - App is starting...');
-
   return (
     <>
       <Toaster 
@@ -105,122 +45,98 @@ function App() {
           },
         }}
       />
-      
-      {/* Debug Banner */}
-      <div style={{ 
-        padding: '10px', 
-        background: '#10b981', 
-        color: 'white',
-        textAlign: 'center',
-        fontSize: '14px',
-        fontWeight: 'bold'
-      }}>
-        ✅ DEBUG: App.jsx loaded successfully
-      </div>
+      <AuthProvider>
+        <BrowserRouter>
+          <Navbar />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Products />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/products" element={<Products />} />
 
-      <SafeComponent name="AuthProvider" fallback={<LoadingSpinner />}>
-        <AuthProvider>
-          <SafeComponent name="BrowserRouter" fallback={<LoadingSpinner />}>
-            <BrowserRouter>
-              <SafeComponent name="Navbar" fallback={<div>Loading Navbar...</div>}>
-                <Navbar />
-              </SafeComponent>
-              
-              {/* Routes Section */}
-              <div style={{ 
-                padding: '10px', 
-                background: '#e0e0e0',
-                textAlign: 'center',
-                fontSize: '12px'
-              }}>
-                🚀 Routes section loading...
-              </div>
+            {/* Role Selection (requires auth but not role) */}
+            <Route
+              path="/select-role"
+              element={
+                <ProtectedRoute requireRole={false}>
+                  <RoleSelection />
+                </ProtectedRoute>
+              }
+            />
 
-              <Routes>
-                {/* Test Route - Always works */}
-                <Route 
-                  path="/test" 
-                  element={
-                    <div style={{ 
-                      padding: '50px', 
-                      textAlign: 'center',
-                      background: 'linear-gradient(to bottom, #f3d7d7, #f9e5e5)',
-                      minHeight: '100vh'
-                    }}>
-                      <h1 style={{ color: '#a94442' }}>✅ TEST ROUTE WORKS!</h1>
-                      <p style={{ color: '#cd5c5c' }}>React Router is functioning correctly</p>
-                      <button 
-                        onClick={() => window.location.href = '/'}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'linear-gradient(135deg, #e57373 0%, #ef9a9a 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          margin: '10px'
-                        }}
-                      >
-                        Go to Home
-                      </button>
-                    </div>
-                  } 
-                />
+            {/* Protected Customer Routes - Wrapped in CustomerDashboardLayout */}
+            <Route
+              path="/cart"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <Cart />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <Checkout />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/profile" element={<Profile />} />
 
-                {/* Home Route with Products */}
-                <Route 
-                  path="/" 
-                  element={
-                    <SafeComponent name="Products" fallback={<LoadingSpinner />}>
-                      <Products />
-                    </SafeComponent>
-                  } 
-                />
+            
+            {/* Order Tracking Route */}
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <OrderTracking />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Payment Route - Added CustomerDashboardLayout */}
+            <Route
+              path="/payment"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <Payment />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/payment-failure" element={<PaymentFailure />} />
 
-                {/* Simple Login Route */}
-                <Route 
-                  path="/login" 
-                  element={
-                    <SafeComponent name="Login" fallback={<LoadingSpinner />}>
-                      <Login />
-                    </SafeComponent>
-                  } 
-                />
-
-                {/* Fallback route */}
-                <Route 
-                  path="*" 
-                  element={
-                    <div style={{ 
-                      padding: '50px', 
-                      textAlign: 'center',
-                      background: 'linear-gradient(to bottom, #f3d7d7, #f9e5e5)',
-                      minHeight: '100vh'
-                    }}>
-                      <h1 style={{ color: '#a94442' }}>🔄 Route Not Found</h1>
-                      <p style={{ color: '#cd5c5c' }}>Path: {window.location.pathname}</p>
-                      <button 
-                        onClick={() => window.location.href = '/test'}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'linear-gradient(135deg, #e57373 0%, #ef9a9a 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          margin: '10px'
-                        }}
-                      >
-                        Test Routing
-                      </button>
-                    </div>
-                  } 
-                />
-              </Routes>
-            </BrowserRouter>
-          </SafeComponent>
-        </AuthProvider>
-      </SafeComponent>
+            {/* Dashboard - Role-based rendering inside */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment-history"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <PaymentHistory />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </>
   );
 }
