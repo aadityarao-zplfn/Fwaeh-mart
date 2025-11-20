@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { Package, Search, Store, DollarSign, RefreshCw, AlertCircle } from 'lucide-react';
+import { Package, Search, Store, IndianRupee, RefreshCw, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const WholesalerCatalog = () => {
@@ -87,7 +87,7 @@ const WholesalerCatalog = () => {
 
     // 1. Validate Price
     if (importPrice <= parseFloat(wholesalerProduct.price)) {
-      toast.error(`Price must be higher than cost ($${wholesalerProduct.price})`);
+      toast.error(`Price must be higher than cost (₹${wholesalerProduct.price})`);
       return;
     }
 
@@ -242,7 +242,7 @@ const WholesalerCatalog = () => {
                 <div className="mt-4 pt-4 border-t border-red-50 space-y-3">
                     <div className="flex justify-between items-center bg-red-50 p-2 rounded-lg">
                         <span className="text-sm font-medium text-red-800">Cost Price:</span>
-                        <span className="font-bold text-red-600 text-lg">${product.price}</span>
+                        <span className="font-bold text-red-600 text-lg">₹{product.price}</span>
                     </div>
 
                     {/* Inputs Container */}
@@ -251,7 +251,7 @@ const WholesalerCatalog = () => {
                         <div>
                             <label className="text-xs text-gray-500 font-semibold ml-1">Your Price</label>
                             <div className="relative">
-                                <DollarSign size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <IndianRupee size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
                                 <input 
                                     type="number" 
                                     placeholder="0.00"
