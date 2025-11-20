@@ -108,33 +108,43 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('📞 Fetching profile for:', userId);
       
-      // Add timeout to prevent hanging
+      // 1. CHECK CACHE FIRST (INSTANT)
+      const cacheKey = `profile_${userId}`;
+      const cachedProfile = localStorage.getItem(cacheKey);
+      
+      if (cachedProfile) {
+        console.log('✅ Using cached profile');
+        const profileData = JSON.parse(cachedProfile);
+        setProfile(profileData);
+        setLoading(false);
+        return; // Exit early - we got the profile!
+      }
+      
+      console.log('🔄 No cache found, fetching from Supabase...');
+      
+      // 2. FETCH FROM SUPABASE WITH TIMEOUT
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout after 10s')), 10000)
+        setTimeout(() => reject(new Error('Profile fetch timeout after 15s')), 15000)
       );
   
       const fetchPromise = supabase
         .from('profiles')
         .select('id, role, full_name')
         .eq('id', userId)
-        .maybeSingle();
+        .single(); // Changed to single() for faster response
   
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
   
-      console.log('🔍 Profile fetch result:', { data, error });
-  
       if (error) {
-        console.error('❌ Profile fetch error:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        });
+        console.error('❌ Profile fetch error:', error);
         throw error;
       }
       
       if (data) {
-        console.log('✅ Profile found:', data);
+        console.log('✅ Profile found, caching result:', data);
+        
+        // 3. CACHE THE RESULT FOR FUTURE VISITS
+        localStorage.setItem(cacheKey, JSON.stringify(data));
         setProfile(data);
       } else {
         console.log('⚠️ No profile found, creating...');
@@ -143,15 +153,17 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('💥 Profile fetch failed:', error);
       
-      // EMERGENCY: Create local profile to unblock the app
-      const emergencyProfile = {
-        id: userId,
-        role: 'retailer',
-        full_name: 'User'
-      };
-      console.log('🚨 Setting emergency profile:', emergencyProfile);
-      setProfile(emergencyProfile);
-      setError('Profile load failed, using emergency profile');
+      // 4. FALLBACK: Try to use any existing cached data as last resort
+      const cacheKey = `profile_${userId}`;
+      const fallbackProfile = localStorage.getItem(cacheKey);
+      
+      if (fallbackProfile) {
+        console.log('🔄 Using fallback cached profile');
+        setProfile(JSON.parse(fallbackProfile));
+      } else {
+        setError('Profile loading... please wait');
+        // Don't set emergency profile - let it keep trying
+      }
     } finally {
       setLoading(false);
     }
@@ -222,7 +234,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🚪 Starting sign out process...');
       
-      // Clear ALL storage first (nuclear option)
+      // Clear ALL storage including profile cache
       localStorage.clear();
       sessionStorage.clear();
       
@@ -237,12 +249,10 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       
       console.log('✅ Sign out successful, forcing page reload...');
-      // Force hard navigation to clear all React state
       window.location.href = '/';
       
     } catch (error) {
       console.error('❌ Error signing out:', error);
-      // Still force clear everything and reload
       localStorage.clear();
       sessionStorage.clear();
       window.location.href = '/';
