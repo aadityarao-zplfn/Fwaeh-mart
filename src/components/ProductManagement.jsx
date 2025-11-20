@@ -5,6 +5,7 @@ import { uploadProductImage } from '../utils/uploadImage';
 import { setStock } from '../utils/inventory';
 import { X, Upload, Plus, Edit, Save, Eye, Clock, HelpCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ProductForm from './ProductForm'; // Adjust path as needed
 
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
@@ -16,7 +17,7 @@ const ProductManagement = () => {
   const [editingId, setEditingId] = useState(null);
   const [quickEditData, setQuickEditData] = useState({});
   const [hoveredImage, setHoveredImage] = useState(null);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   // Added restock_uncertain to state
   const [formData, setFormData] = useState({
@@ -776,6 +777,17 @@ const ProductManagement = () => {
             </div>
           ))}
         </div>
+      )}
+      {/* ✅ ADD PRODUCT FORM MODAL - PUT THIS RIGHT HERE */}
+      {showForm && (
+        <ProductForm 
+          product={editingProduct} 
+          onClose={() => {
+            setShowForm(false);
+            setEditingProduct(null);
+            fetchProducts(); // Refresh products after form closes
+          }} 
+        />
       )}
     </div>
   );
