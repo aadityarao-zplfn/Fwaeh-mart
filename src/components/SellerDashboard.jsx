@@ -2,19 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import ProductManagement from './ProductManagement';
-import AnalyticsOverview from './AnalyticsOverview';
 import WholesalerCatalog from './WholesalerCatalog';
 
 const SellerDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({ totalSales: 0, totalOrders: 0, totalProducts: 0 });
-  const [dashboardLoading, setDashboardLoading] = useState(true); // ✅ Renamed to avoid conflict
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('products');
   
-  // 🎯 CRITICAL: Get profile to check the user's role
-  const { user, profile, loading: authLoading, error: authError } = useAuth(); // ✅ Renamed auth loading/error
+  const { user, profile, loading: authLoading, error: authError } = useAuth();
 
-  // ✅ Handle auth states FIRST - before any data fetching
   if (authLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -41,7 +38,6 @@ const SellerDashboard = () => {
   }
 
   useEffect(() => {
-    // Ensure user is loaded before fetching data
     if (user) {
       fetchSellerData();
     }
@@ -101,7 +97,6 @@ const SellerDashboard = () => {
     }
   };
 
-  // ✅ REMOVED DUPLICATE LOADING CHECK - only handle dashboard loading for content
   if (dashboardLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -131,21 +126,7 @@ const SellerDashboard = () => {
         >
           My Products
         </button>
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${
-            activeTab === 'analytics'
-              ? 'text-white shadow-lg'
-              : 'text-red-600 bg-white border-2 border-red-200'
-          }`}
-          style={{
-            background: activeTab === 'analytics' ? 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' : 'transparent'
-          }}
-        >
-          Sales Analytics
-        </button>
         
-        {/* 🎯 PHASE 2: ONLY SHOW CATALOG TAB FOR RETAILERS */}
         {profile?.role === 'retailer' && (
           <button
             onClick={() => setActiveTab('catalog')}
@@ -164,7 +145,7 @@ const SellerDashboard = () => {
       </div>
 
       {/* Content based on active tab */}
-      {activeTab === 'products' ? (
+      {activeTab === 'products' && (
         <>
           {/* Enhanced Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -326,10 +307,10 @@ const SellerDashboard = () => {
             )}
           </div>
         </>
-      ) : activeTab === 'catalog' && profile?.role === 'retailer' ? (
+      )}
+
+      {activeTab === 'catalog' && profile?.role === 'retailer' && (
         <WholesalerCatalog />
-      ) : (
-        <AnalyticsOverview />
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+/*
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSellerAnalytics, getAnalyticsSummary } from '../utils/analytics.jsx';
@@ -63,10 +64,10 @@ const AnalyticsOverview = () => {
       </div>
     );
   }
-
+ 
   return (
     <div className="space-y-8">
-      {/* Analytics Stats */}
+      {/* Analytics Stats */ /*}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Views"
@@ -94,7 +95,7 @@ const AnalyticsOverview = () => {
         />
       </div>
 
-      {/* Conversion Metrics */}
+      {/* Conversion Metrics */ /*}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-xl p-6 shadow-md" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
           <h3 className="text-lg font-bold mb-4 flex items-center" style={{ color: '#b91c1c' }}>
@@ -167,7 +168,7 @@ const AnalyticsOverview = () => {
         </div>
       </div>
 
-      {/* Product Performance Table */}
+      {/* Product Performance Table *//*}
       <div className="rounded-xl p-6 shadow-md" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
         <h3 className="text-lg font-bold mb-4" style={{ color: '#b91c1c' }}>Product Performance</h3>
         
@@ -224,3 +225,5 @@ const AnalyticsOverview = () => {
 };
 
 export default AnalyticsOverview;
+
+*/
