@@ -107,26 +107,19 @@ export const AuthProvider = ({ children }) => {
   const fetchProfile = async (userId) => {
     try {
       console.log('📞 Fetching profile for:', userId);
-      console.log('🔍 Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
       
-      // Test basic connection first
-      const { data: testData, error: testError } = await supabase
-        .from('profiles')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('❌ Basic profiles query failed:', testError);
-        throw testError;
-      }
-      console.log('✅ Basic profiles query works');
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout after 10s')), 10000)
+      );
   
-      // Now try the actual profile fetch
-      const { data, error } = await supabase
+      const fetchPromise = supabase
         .from('profiles')
         .select('id, role, full_name')
         .eq('id', userId)
         .maybeSingle();
+  
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
   
       console.log('🔍 Profile fetch result:', { data, error });
   
@@ -148,8 +141,17 @@ export const AuthProvider = ({ children }) => {
         await createProfile(userId);
       }
     } catch (error) {
-      console.error('💥 Profile fetch completely failed:', error);
-      setError('Failed to load profile: ' + error.message);
+      console.error('💥 Profile fetch failed:', error);
+      
+      // EMERGENCY: Create local profile to unblock the app
+      const emergencyProfile = {
+        id: userId,
+        role: 'retailer',
+        full_name: 'User'
+      };
+      console.log('🚨 Setting emergency profile:', emergencyProfile);
+      setProfile(emergencyProfile);
+      setError('Profile load failed, using emergency profile');
     } finally {
       setLoading(false);
     }
