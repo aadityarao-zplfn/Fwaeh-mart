@@ -8,7 +8,6 @@ const RetailerDashboardLayout = ({ children }) => {
 
   const navItems = [
     { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { path: '/dashboard/products', label: 'My Products', icon: Package },
     { path: '/dashboard/orders', label: 'Orders', icon: ShoppingBag },
     { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/dashboard/reviews', label: 'Reviews', icon: MessageSquare },
