@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
 import NearbyShopsMap from '../components/NearbyShopsMap';
+import { calculateDistance } from '../utils/location';
 import { Search, SlidersHorizontal, X, ChevronDown, ChevronUp, Star, MapPin, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -12,7 +13,7 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [priceRange, setPriceRange] = useState([0, 1000]);
+  const [priceRange, setPriceRange] = useState([0, 10000]);
   const [showInStock, setShowInStock] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
@@ -24,17 +25,15 @@ const Products = () => {
   const [showMap, setShowMap] = useState(false);
   const { user } = useAuth();
 
-  // Collapsible sections
   const [expandedSections, setExpandedSections] = useState({
     category: true,
     price: true,
     stock: true,
     seller: true,
     rating: false,
-    distance: false
+    distance: true 
   });
 
-  // 1. Fetch products on load
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -50,20 +49,16 @@ const Products = () => {
           });
         },
         (error) => {
-          console.log('Location access denied:', error);
-          // Fallback to Secunderabad
-          setUserLocation({
-            lat: 17.385,
-            lng: 78.486
-          });
+          console.log('Location access denied, using default:', error);
+          // Fallback to Secunderabad if needed, or leave null
+          setUserLocation({ lat: 17.385, lng: 78.486 });
         }
       );
     }
   }, []);
 
-  // 3. ✅ REAL-TIME SUBSCRIPTION FOR STOCK CHANGES
+  // Real-time subscription
   useEffect(() => {
-    console.log('🔌 Subscribing to public.products updates...');
     const subscription = supabase
       .channel('product-updates')
       .on(
@@ -74,8 +69,6 @@ const Products = () => {
           table: 'products',
         },
         (payload) => {
-          console.log('⚡ Real-time update received:', payload);
-          // Update the local product state when a change happens
           setProducts((currentProducts) =>
             currentProducts.map((p) =>
               p.id === payload.new.id ? { ...p, ...payload.new } : p
@@ -86,13 +79,13 @@ const Products = () => {
       .subscribe();
 
     return () => {
-      console.log('🗑️ Unsubscribing from product updates.');
       subscription.unsubscribe();
     };
   }, []);
 
   const fetchProducts = async () => {
     try {
+      // Join with profiles to get seller location data
       let query = supabase
         .from('products')
         .select(`
@@ -106,7 +99,6 @@ const Products = () => {
       
       if (error) throw error;
 
-      // Your filtering logic here
       const filteredData = data.filter(product => 
         product.seller?.role === 'retailer' || product.is_public === true
       );
@@ -120,22 +112,18 @@ const Products = () => {
     }
   };
 
-  // Get categories from products
   const categories = useMemo(() => {
     return [...new Set(products.map(p => p.category))];
   }, [products]);
 
-  // Get max price from products
   const maxPrice = useMemo(() => {
     if (products.length === 0) return 1000;
     return Math.ceil(Math.max(...products.map(p => parseFloat(p.price || 0))));
   }, [products]);
 
-  // Filter and sort products - MEMOIZED
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
-    // Search filter
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(p => 
@@ -144,36 +132,55 @@ const Products = () => {
       );
     }
 
-    // Category filter
     if (categoryFilter !== 'all') {
       filtered = filtered.filter(p => p.category === categoryFilter);
     }
 
-    // Price filter
     filtered = filtered.filter(p => {
       const price = parseFloat(p.price || 0);
       return price >= priceRange[0] && price <= priceRange[1];
     });
 
-    // Stock filter
     if (showInStock) {
       filtered = filtered.filter(p => p.stock_quantity > 0);
     }
 
-    // Rating filter
     if (minRating > 0) {
       filtered = filtered.filter((product) => (product.rating || 0) >= minRating);
     }
 
-    // Seller type filter
     if (sellerType !== 'all') {
       filtered = filtered.filter((product) => product.seller?.role === sellerType);
     }
     
-    // Distance filter logic remains the same
+    // Distance Filter
+    if (userLocation && maxDistance < 100) { 
+      filtered = filtered.filter(p => {
+        if (!p.seller?.location_lat || !p.seller?.location_lng) return true; 
+        
+        const dist = calculateDistance(
+          userLocation.lat, userLocation.lng,
+          p.seller.location_lat, p.seller.location_lng
+        );
+        return dist <= maxDistance;
+      });
+    }
 
     // Sort
     switch (sortBy) {
+      case 'nearest':
+        if (userLocation) {
+          filtered.sort((a, b) => {
+            const distA = (a.seller?.location_lat) 
+              ? calculateDistance(userLocation.lat, userLocation.lng, a.seller.location_lat, a.seller.location_lng) 
+              : Infinity;
+            const distB = (b.seller?.location_lat) 
+              ? calculateDistance(userLocation.lat, userLocation.lng, b.seller.location_lat, b.seller.location_lng) 
+              : Infinity;
+            return distA - distB;
+          });
+        }
+        break;
       case 'price-low':
         filtered.sort((a, b) => parseFloat(a.price || 0) - parseFloat(b.price || 0));
         break;
@@ -192,7 +199,7 @@ const Products = () => {
     }
 
     return filtered;
-  }, [products, searchTerm, categoryFilter, priceRange, showInStock, sortBy, minRating, sellerType]);
+  }, [products, searchTerm, categoryFilter, priceRange, showInStock, sortBy, minRating, sellerType, maxDistance, userLocation]);
 
   const addToCart = async (productId) => {
     if (!user) {
@@ -236,17 +243,17 @@ const Products = () => {
     setSortBy('newest');
     setShowInStock(false);
     setMinRating(0);
-    setMaxDistance(50);
+    setMaxDistance(100);
     setSellerType('all');
     setPriceRange([0, maxPrice]);
   };
 
-  // Get active filters count
   const activeFiltersCount = [
     categoryFilter !== 'all',
     showInStock,
     minRating > 0,
     sellerType !== 'all',
+    maxDistance < 100,
     priceRange[0] > 0 || priceRange[1] < maxPrice
   ].filter(Boolean).length;
 
@@ -288,7 +295,6 @@ const Products = () => {
     </div>
   );
 
-  // Loading Skeleton
   const SkeletonCard = () => (
     <div className="rounded-2xl overflow-hidden shadow-lg animate-pulse" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
       <div className="w-full h-48 bg-gradient-to-br from-red-100 to-red-200"></div>
@@ -321,7 +327,6 @@ const Products = () => {
   return (
     <div className="min-h-screen p-4 md:p-8" style={{ background: 'linear-gradient(135deg, #ffe8e8 0%, #fff0f0 50%, #ffe8e8 100%)' }}>
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold mb-2" style={{ color: '#b91c1c' }}>
             Browse Products
@@ -366,6 +371,7 @@ const Products = () => {
                 onChange={(e) => setSortBy(e.target.value)}
               >
                 <option value="newest">Newest First</option>
+                <option value="nearest">📍 Distance: Nearest First</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
                 <option value="name">Name: A to Z</option>
@@ -404,7 +410,7 @@ const Products = () => {
             </button>
           </div>
 
-          {/* Enhanced Filter Panel */}
+          {/* Filter Panel */}
           {showFilters && (
             <div className="mt-6 pt-6 grid md:grid-cols-2 gap-6" style={{ borderTop: '2px solid #fca5a5' }}>
               <div>
@@ -487,9 +493,6 @@ const Products = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="text-center text-sm font-bold" style={{ color: '#dc2626' }}>
-                      ${priceRange[0]} - ${priceRange[1]}
-                    </div>
                   </div>
                 </FilterSection>
 
@@ -524,6 +527,33 @@ const Products = () => {
               </div>
 
               <div>
+                {/* Distance Filter */}
+                <FilterSection title="Distance" section="distance">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm font-bold" style={{ color: '#b91c1c' }}>
+                      <div className="flex items-center gap-2">
+                        <MapPin size={18} style={{ color: '#ff5757' }} />
+                        <span>Range: {maxDistance < 100 ? `${maxDistance} km` : 'Unlimited'}</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={maxDistance}
+                      onChange={(e) => setMaxDistance(parseInt(e.target.value))}
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, #ff5757 0%, #ff8282 ${maxDistance}%, #fca5a5 ${maxDistance}%, #fca5a5 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                        <span>1 km</span>
+                        <span>100+ km</span>
+                    </div>
+                  </div>
+                </FilterSection>
+
                 {/* Seller Type */}
                 <FilterSection title="Seller Type" section="seller">
                   <div className="flex flex-wrap gap-2">
@@ -578,27 +608,6 @@ const Products = () => {
                         {minRating}+ stars and above
                       </p>
                     )}
-                  </div>
-                </FilterSection>
-
-                {/* Distance Filter */}
-                <FilterSection title="Distance" section="distance">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-bold" style={{ color: '#b91c1c' }}>
-                      <MapPin size={18} style={{ color: '#ff5757' }} />
-                      <span>Within {maxDistance} km</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="100"
-                      value={maxDistance}
-                      onChange={(e) => setMaxDistance(parseInt(e.target.value))}
-                      className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-                      style={{
-                        background: `linear-gradient(to right, #ff5757 0%, #ff8282 ${maxDistance}%, #fca5a5 ${maxDistance}%, #fca5a5 100%)`
-                      }}
-                    />
                   </div>
                 </FilterSection>
               </div>
@@ -664,6 +673,7 @@ const Products = () => {
                 <ProductCard
                   product={product}
                   onAddToCart={addToCart}
+                  userLocation={userLocation}
                 />
               </div>
             ))}

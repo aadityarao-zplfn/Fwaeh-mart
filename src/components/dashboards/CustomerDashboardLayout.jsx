@@ -1,20 +1,20 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, ShoppingCart, Package, User, CreditCard, Heart, Menu, X } from 'lucide-react';
+import { Home, ShoppingBag, ShoppingCart, Package, User, CreditCard, Store, Menu, X } from 'lucide-react'; // ✅ Added 'Store' icon
 
 const CustomerDashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-const navItems = [
+  const navItems = [
     { path: '/dashboard', label: 'Home', icon: Home },
     { path: '/products', label: 'Browse Products', icon: ShoppingBag },
+    { path: '/shops', label: 'Nearby Shops', icon: Store }, // ✅ NEW LINK ADDED HERE
     { path: '/cart', label: 'My Cart', icon: ShoppingCart },
     { path: '/orders', label: 'My Orders', icon: Package },
-  //  { path: '/wishlist', label: 'Wishlist', icon: Heart },
     { path: '/payment-history', label: 'Payment History', icon: CreditCard }, 
     { path: '/profile', label: 'Profile', icon: User },
-];
+  ];
 
   const isActive = (path) => location.pathname === path;
 
@@ -55,7 +55,7 @@ const navItems = [
             border: '1px solid rgba(255, 180, 200, 0.3)'
           }}
         >
-          {/* Top Label - Hidden on mobile in sidebar */}
+          {/* Top Label */}
           <div className="text-center mb-6 lg:mb-4">
             <p 
               className="text-sm font-semibold tracking-wide uppercase"
@@ -65,7 +65,7 @@ const navItems = [
             </p>
           </div>
 
-          {/* Header with Icon - Hidden on mobile in sidebar */}
+          {/* Header with Icon */}
           <div className="text-center mb-8 lg:mb-6">
             <div 
               className="inline-flex items-center justify-center w-16 h-16 lg:w-12 lg:h-12 rounded-full mb-3 shadow-lg"
@@ -119,7 +119,6 @@ const navItems = [
 
       {/* Main content */}
       <div className="lg:flex-1 lg:max-w-4xl w-full">
-        {/* Main Card Container */}
         <div 
           className="rounded-3xl shadow-2xl p-6 lg:p-8"
           style={{
@@ -127,7 +126,7 @@ const navItems = [
             border: '1px solid rgba(255, 180, 200, 0.3)'
           }}
         >
-          {/* Top Label - Only show on desktop (hidden in mobile sidebar) */}
+          {/* Top Label Desktop */}
           <div className="text-center mb-4 hidden lg:block">
             <p 
               className="text-sm font-semibold tracking-wide uppercase"
@@ -137,7 +136,7 @@ const navItems = [
             </p>
           </div>
 
-          {/* Header with Icon - Only show on desktop (hidden in mobile sidebar) */}
+          {/* Header Desktop */}
           <div className="text-center mb-8 hidden lg:block">
             <div 
               className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 shadow-lg"
@@ -174,7 +173,7 @@ const navItems = [
         </div>
       </div>
 
-      {/* Overlay for mobile when sidebar is open */}
+      {/* Overlay */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"

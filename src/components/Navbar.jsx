@@ -15,7 +15,6 @@ const Navbar = () => {
     if (user && profile?.role === 'customer') {
       fetchCartCount();
       
-      // Set up real-time subscription for cart changes
       const cartSubscription = supabase
         .channel('cart_changes')
         .on(
@@ -70,19 +69,14 @@ const Navbar = () => {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-     {/* Logo */}
-<Link 
-  to="/" 
-  className="flex items-center text-2xl font-bold transition-all hover:opacity-80"
-  style={{ color: '#b91c1c' }}
->
-  {/* <img 
-    src="https://i.ibb.co/fYvF8s8V/Whats-App-Image-2025-11-18-at-22-03-30-942d91e3-removebg-preview.png" 
-    alt="Fwaeh Mart Logo" 
-    className="h-40 w-20 -mr-2 -mt-3 object-contain"
-  /> */}
-  Fwaeh Mart
-</Link>
+         {/* Logo */}
+        <Link 
+          to="/" 
+          className="flex items-center text-2xl font-bold transition-all hover:opacity-80"
+          style={{ color: '#b91c1c' }}
+        >
+          Fwaeh Mart
+        </Link>
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-6">
@@ -93,6 +87,15 @@ const Navbar = () => {
             >
               Products
             </Link>
+            {/* ✅ NEW SHOPS LINK */}
+            <Link 
+              to="/shops" 
+              className="font-medium transition-all hover:opacity-80"
+              style={{ color: '#dc2626' }}
+            >
+              Shops
+            </Link>
+
             {user && profile?.role === 'customer' && (
               <Link 
                 to="/cart" 
@@ -126,7 +129,6 @@ const Navbar = () => {
                   <span className="hidden sm:inline">Dashboard</span>
                 </Link>
                 
-                {/* Notification Bell */}
                 <NotificationBell />
 
                 <button
@@ -166,15 +168,29 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Cart Icon (visible on small screens) */}
+      {/* Mobile Cart Icon */}
       {user && profile?.role === 'customer' && (
         <div 
-          className="md:hidden border-t"
+          className="md:hidden border-t flex justify-around py-2"
           style={{ borderColor: '#fca5a5' }}
         >
+           <Link 
+            to="/products" 
+            className="font-medium transition-all hover:opacity-80"
+            style={{ color: '#dc2626' }}
+          >
+            Products
+          </Link>
+          <Link 
+            to="/shops" 
+            className="font-medium transition-all hover:opacity-80"
+            style={{ color: '#dc2626' }}
+          >
+            Shops
+          </Link>
           <Link 
             to="/cart" 
-            className="flex items-center justify-center py-3 font-medium transition-all relative"
+            className="flex items-center justify-center font-medium transition-all relative"
             style={{ color: '#dc2626' }}
           >
             <ShoppingCart size={20} className="mr-2" />

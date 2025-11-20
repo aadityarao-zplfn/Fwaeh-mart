@@ -12,11 +12,15 @@ import Checkout from './pages/Checkout';
 import Dashboard from './pages/Dashboard';
 import OrderTracking from './pages/OrderTracking';
 import CustomerDashboardLayout from './components/dashboards/CustomerDashboardLayout';
+import RetailerDashboardLayout from './components/dashboards/RetailerDashboardLayout';
+import WholesalerDashboardLayout from './components/dashboards/WholesalerDashboardLayout';
 import Payment from './pages/Payment';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentFailure from './pages/PaymentFailure';
 import PaymentHistory from './pages/PaymentHistory';
 import Profile from './pages/Profile';
+import DashboardSettings from './pages/DashboardSettings';
+import Shops from './pages/Shops';
 
 function App() {
   return (
@@ -54,8 +58,9 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/shops" element={<Shops />} /> {/* ✅ New Route */}
 
-            {/* Role Selection (requires auth but not role) */}
+            {/* Role Selection */}
             <Route
               path="/select-role"
               element={
@@ -65,7 +70,7 @@ function App() {
               }
             />
 
-            {/* Protected Customer Routes - Wrapped in CustomerDashboardLayout */}
+            {/* Protected Customer Routes */}
             <Route
               path="/cart"
               element={
@@ -87,9 +92,8 @@ function App() {
               }
             />
             <Route path="/profile" element={<Profile />} />
-
             
-            {/* Order Tracking Route */}
+            {/* Order Tracking */}
             <Route
               path="/orders"
               element={
@@ -101,7 +105,7 @@ function App() {
               }
             />
             
-            {/* Payment Route - Added CustomerDashboardLayout */}
+            {/* Payment Routes */}
             <Route
               path="/payment"
               element={
@@ -114,16 +118,6 @@ function App() {
             />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-failure" element={<PaymentFailure />} />
-
-            {/* Dashboard - Role-based rendering inside */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/payment-history"
               element={
@@ -134,6 +128,41 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Dashboard Main Route */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ Retailer Settings */}
+            <Route
+              path="/dashboard/settings"
+              element={
+                <ProtectedRoute allowedRoles={['retailer']}>
+                  <RetailerDashboardLayout>
+                    <DashboardSettings />
+                  </RetailerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ Wholesaler Settings */}
+             <Route
+              path="/wholesaler/settings"
+              element={
+                <ProtectedRoute allowedRoles={['wholesaler']}>
+                  <WholesalerDashboardLayout>
+                    <DashboardSettings />
+                  </WholesalerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+
           </Routes>
         </BrowserRouter>
       </AuthProvider>
