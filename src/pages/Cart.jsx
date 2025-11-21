@@ -5,8 +5,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Heart, ArrowRight, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Store } from 'lucide-react';
+import { useCart } from '../contexts/CartContext';
 
 const Cart = () => {
+  const { updateCartCount } = useCart(); 
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingItem, setUpdatingItem] = useState(null);
@@ -96,45 +98,82 @@ const Cart = () => {
     }
   };
 
-  const updateQuantity = async (itemId, newQuantity, maxStock) => {
-    if (newQuantity < 1 || newQuantity > maxStock) {
-      toast.error(`Quantity must be between 1 and ${maxStock}`);
-      return;
-    }
+  // In Cart.jsx - Replace the updateQuantity function with this:
 
-    setUpdatingItem(itemId);
-    try {
+const updateQuantity = async (itemId, newQuantity, maxStock) => {
+  if (newQuantity < 1 || newQuantity > maxStock) {
+    toast.error(`Quantity must be between 1 and ${maxStock}`);
+    return;
+  }
+
+  setUpdatingItem(itemId);
+  try {
+    // Get current quantity to calculate difference
+      const currentItem = cartItems.find(item => item.id === itemId);
+      const quantityDiff = newQuantity - currentItem.quantity;
+
       const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity: newQuantity })
-        .eq('id', itemId);
+      .from('cart_items')
+      .update({ quantity: newQuantity })
+      .eq('id', itemId);
 
-      if (error) throw error;
-      toast.success('Cart updated');
-    } catch (error) {
-      console.error('Error updating quantity:', error);
-      toast.error('Failed to update quantity');
-    } finally {
-      setUpdatingItem(null);
-    }
-  };
+    if (error) throw error;
+    
+    // Update local state immediately for better UX
+    setCartItems(currentItems =>
+      currentItems.map(item =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      )
+    );
+     // ✅ IMMEDIATELY UPDATE NAVBAR CART COUNT
+    updateCartCount(quantityDiff);
+
+    toast.success('Cart updated');
+  } catch (error) {
+    console.error('Error updating quantity:', error);
+    toast.error('Failed to update quantity');
+    
+    // Revert local state on error
+    fetchCartItems();
+  } finally {
+    setUpdatingItem(null);
+  }
+};
 
   const removeItem = async (itemId) => {
-    if (!confirm('Remove this item from cart?')) return;
+  if (!confirm('Remove this item from cart?')) return;
 
-    try {
-      const { error } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('id', itemId);
+  console.log('🗑️ Starting to remove item:', itemId);
+  
+  try {
+    // Get item quantity before removal
+    const itemToRemove = cartItems.find(item => item.id === itemId);
+    const quantityToRemove = itemToRemove?.quantity || 0;
+    
+    console.log('📊 Removing quantity:', quantityToRemove);
 
-      if (error) throw error;
-      toast.success('Item removed from cart');
-    } catch (error) {
-      console.error('Error removing item:', error);
-      toast.error('Failed to remove item');
-    }
-  };
+    const { error } = await supabase
+      .from('cart_items')
+      .delete()
+      .eq('id', itemId);
+
+    if (error) throw error;
+
+    console.log('✅ Database deletion successful');
+    
+    // ✅ IMMEDIATELY UPDATE NAVBAR CART COUNT
+    updateCartCount(-quantityToRemove);
+    
+    // ✅ IMMEDIATELY UPDATE LOCAL STATE - This was missing!
+    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+    console.log('🔄 Local state updated, remaining items:', cartItems.length - 1);
+
+    toast.success('Item removed from cart');
+  } catch (error) {
+    console.error('❌ Error removing item:', error);
+    toast.error('Failed to remove item');
+  }
+};
 
   const applyPromoCode = () => {
     const validCodes = {
@@ -199,6 +238,7 @@ const Cart = () => {
         ]);
 
       if (error) throw error;
+      updateCartCount(1);
       toast.success('Product added to cart');
       fetchCartItems();
     } catch (error) {
@@ -330,13 +370,17 @@ const Cart = () => {
                       >
                         <Minus size={18} className="text-white" />
                       </button>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1, item.products.stock_quantity)}
-                        className="w-16 text-center py-2 rounded-lg font-bold"
-                        style={{ background: 'rgba(255, 255, 255, 0.8)', color: '#a94442', border: '2px solid #f8b4b4' }}
-                      />
+                      
+                      <div className="w-16 text-center py-2 rounded-lg font-bold"
+                          style={{ background: 'rgba(255, 255, 255, 0.8)', color: '#a94442', border: '2px solid #f8b4b4' }}>
+                        {updatingItem === item.id ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 mx-auto" 
+                              style={{ borderColor: '#a94442', borderTopColor: 'transparent' }}></div>
+                        ) : (
+                          item.quantity
+                        )}
+                      </div>
+                      
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity + 1, item.products.stock_quantity)}
                         disabled={updatingItem === item.id || item.quantity >= item.products.stock_quantity}
@@ -358,21 +402,21 @@ const Cart = () => {
                   </div>
 
                   {/* Price and Actions */}
-                  <div className="text-right flex flex-col justify-between">
+                  <div className="text-right flex flex-col justify-between items-end pr-2">
                     <div>
-                      <p className="text-3xl font-bold mb-1" style={{ color: '#e57373' }}>
+                      <p className="text-xl font-bold mb-1" style={{ color: '#e57373' }}>
                         ₹{(parseFloat(item.products.price) * item.quantity).toFixed(2)}
                       </p>
-                      <p className="text-sm mb-6" style={{ color: '#cd5c5c' }}>
+                      <p className="text-xs mb-6" style={{ color: '#cd5c5c' }}>
                         ₹{parseFloat(item.products.price).toFixed(2)} each
                       </p>
                     </div>
                     <button
                       onClick={() => removeItem(item.id)}
-                      className="p-3 rounded-lg hover:opacity-80 transition-all"
+                      className="p-2 rounded-lg hover:opacity-80 transition-all"
                       style={{ background: 'rgba(255, 255, 255, 0.8)', color: '#e57373', border: '2px solid #f8b4b4' }}
                     >
-                      <Trash2 size={20} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </div>

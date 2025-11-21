@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
+
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -28,6 +29,7 @@ import CustomerOrderHistory from './components/dashboards/CustomerOrderHistory';
 import SchedulePickup from './pages/SchedulePickup';
 import PickupSuccess from './pages/PickupSuccess';
 import QueriesPage from './pages/QueriesPage';
+import { CartProvider } from './contexts/CartContext';
 
 function App() {
   return (
@@ -57,9 +59,10 @@ function App() {
         }}
       />
       <AuthProvider>
-        <BrowserRouter>
-          <Navbar />
-          <Routes>
+        <CartProvider>
+          <BrowserRouter>
+            <Navbar />
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Products />} />
             <Route path="/login" element={<Login />} />
@@ -245,8 +248,9 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-          </Routes>
-        </BrowserRouter>
+            </Routes>
+         </BrowserRouter>
+        </CartProvider>
       </AuthProvider>
     </>
   );

@@ -7,19 +7,22 @@ const ProductCard = ({ product, onAddToCart, userLocation, rating, reviewCount }
   const [isLoading, setIsLoading] = useState(false)
   const { profile } = useAuth()
 
-  const handleAddToCart = async (e) => {
-    e.stopPropagation(); 
-    if (!product || product.stock_quantity === 0) return;
-    
-    setIsLoading(true)
-    try {
-      if (onAddToCart) {
-        await onAddToCart(product.id)
-      }
-    } finally {
-      setIsLoading(false)
+  // In ProductCard.jsx - Update the handleAddToCart function:
+
+const handleAddToCart = async (e) => {
+  e.stopPropagation(); 
+  if (!product || product.stock_quantity === 0) return;
+  
+  setIsLoading(true)
+  try {
+    if (onAddToCart) {
+      // Always add 1 quantity from product card
+      await onAddToCart(product.id, 1)
     }
+  } finally {
+    setIsLoading(false)
   }
+}
 
   if (!product) return null
 

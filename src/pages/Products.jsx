@@ -7,8 +7,10 @@ import NearbyShopsMap from '../components/NearbyShopsMap';
 import { calculateDistance } from '../utils/location';
 import { Search, SlidersHorizontal, X, ChevronDown, ChevronUp, Star, MapPin, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useCart } from '../contexts/CartContext';
 
 const Products = () => {
+  const { updateCartCount } = useCart();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -236,41 +238,49 @@ const Products = () => {
     return filtered;
   }, [products, searchTerm, categoryFilter, priceRange, showInStock, sortBy, minRating, sellerType, maxDistance, userLocation]);
 
-  const addToCart = async (productId) => {
-    if (!user) {
-      toast.error('Please login to add items to cart');
-      return;
-    }
+  // In Products.jsx - Replace the existing addToCart function with this:
 
-    try {
-      const { data: existingItem } = await supabase
+const addToCart = async (productId, quantity = 1) => {
+  if (!user) {
+    toast.error('Please login to add items to cart');
+    return;
+  }
+
+  try {
+    const { data: existingItem } = await supabase
+      .from('cart_items')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('product_id', productId)
+      .maybeSingle();
+
+    if (existingItem) {
+      const { error } = await supabase
         .from('cart_items')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('product_id', productId)
-        .maybeSingle();
+        .update({ quantity: existingItem.quantity + quantity })
+        .eq('id', existingItem.id);
 
-      if (existingItem) {
-        const { error } = await supabase
-          .from('cart_items')
-          .update({ quantity: existingItem.quantity + 1 })
-          .eq('id', existingItem.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('cart_items')
+        .insert([{ 
+          user_id: user.id, 
+          product_id: productId, 
+          quantity: quantity 
+        }]);
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('cart_items')
-          .insert([{ user_id: user.id, product_id: productId, quantity: 1 }]);
-
-        if (error) throw error;
-      }
-
-      toast.success('Added to cart!');
+      if (error) throw error;
+    }
+// ✅ IMMEDIATELY UPDATE NAVBAR CART COUNT
+      updateCartCount(quantity);
+      
+      toast.success(`Added ${quantity} item(s) to cart!`);
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Failed to add to cart');
-    }
-  };
+  }
+};
 
   const clearFilters = () => {
     setSearchTerm('');

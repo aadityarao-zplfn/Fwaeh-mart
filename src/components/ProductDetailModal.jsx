@@ -86,24 +86,29 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
 
   const seller = getSellerProfile();
 
-  const handleAddToCart = async () => {
-    if (!product || product.stock_quantity === 0) return;
+  // In ProductDetailModal.jsx - Replace the handleAddToCart function with this:
+
+const handleAddToCart = async () => {
+  if (!product || product.stock_quantity === 0) return;
+  
+  setIsLoading(true);
+  try {
+    const toastId = toast.loading(`Adding ${quantity} item(s) to cart...`);
     
-    setIsLoading(true);
-    try {
-      const toastId = toast.loading(`Adding ${quantity} item(s) to cart...`);
-      if (onAddToCart) {
-        await onAddToCart(product.id, quantity);
-      }
-      toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
-      onClose();
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      toast.error('Failed to add to cart');
-    } finally {
-      setIsLoading(false);
+    // Pass the quantity to onAddToCart
+    if (onAddToCart) {
+      await onAddToCart(product.id, quantity);
     }
-  };
+    
+    toast.success(`Added ${quantity} item(s) to cart! 🛒`, { id: toastId });
+    onClose();
+  } catch (error) {
+    console.error('Error adding to cart:', error);
+    toast.error('Failed to add to cart');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const incrementQuantity = () => {
     if (quantity < product.stock_quantity) {

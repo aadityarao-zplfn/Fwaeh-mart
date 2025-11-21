@@ -1,19 +1,20 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ShoppingCart, LogOut, LayoutDashboard } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import NotificationBell from './NotificationBell';
+import { useCart } from '../contexts/CartContext';
 
 const Navbar = () => {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const [cartCount, setCartCount] = useState(0);
+  const { cartCount, updateCartCount, refreshCart } = useCart(); // ✅ Use the correct functions
 
   // Fetch cart count when user logs in
   useEffect(() => {
     if (user && profile?.role === 'customer') {
-      fetchCartCount();
+      refreshCart(); // ✅ Use refreshCart instead of fetchCartCount
       
       const cartSubscription = supabase
         .channel('cart_changes')
@@ -26,7 +27,7 @@ const Navbar = () => {
             filter: `user_id=eq.${user.id}`
           },
           () => {
-            fetchCartCount();
+            refreshCart(); // ✅ Use refreshCart on cart changes
           }
         )
         .subscribe();
@@ -35,30 +36,13 @@ const Navbar = () => {
         cartSubscription.unsubscribe();
       };
     } else {
-      setCartCount(0);
+      updateCartCount(0); // ✅ Reset when user logs out or is not customer
     }
   }, [user, profile]);
 
-  const fetchCartCount = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('cart_items')
-        .select('quantity')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      const total = data?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-      setCartCount(total);
-    } catch (error) {
-      console.error('Error fetching cart count:', error);
-      setCartCount(0);
-    }
-  };
-
   const handleSignOut = async () => {
+    updateCartCount(0); // ✅ Reset cart count on logout using updateCartCount
     await signOut();
-    setCartCount(0);
     navigate('/login');
   };
 
@@ -69,14 +53,14 @@ const Navbar = () => {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-         {/* Logo */}
-        <Link 
-          to="/" 
-          className="flex items-center text-2xl font-bold transition-all hover:opacity-80"
-          style={{ color: '#b91c1c' }}
-        >
-          Fwaeh Mart
-        </Link>
+          {/* Logo */}
+          <Link 
+            to="/" 
+            className="flex items-center text-2xl font-bold transition-all hover:opacity-80"
+            style={{ color: '#b91c1c' }}
+          >
+            Fwaeh Mart
+          </Link>
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-6">
@@ -174,7 +158,7 @@ const Navbar = () => {
           className="md:hidden border-t flex justify-around py-2"
           style={{ borderColor: '#fca5a5' }}
         >
-           <Link 
+          <Link 
             to="/products" 
             className="font-medium transition-all hover:opacity-80"
             style={{ color: '#dc2626' }}
