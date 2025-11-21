@@ -47,42 +47,84 @@ const SellerDashboard = () => {
     try {
       setDashboardLoading(true);
       
+      // Step 1: Get order items for this seller using the explicit relationship
       const { data: orderItems, error: itemsError } = await supabase
         .from('order_items')
-        .select('*, orders(id, created_at, status, shipping_address), products(name, image_url)')
+        .select('*')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
       if (itemsError) throw itemsError;
 
+      // Step 2: Get related orders
+      const orderIds = orderItems ? [...new Set(orderItems.map(item => item.order_id))] : [];
+      let ordersData = [];
+      
+      if (orderIds.length > 0) {
+        const { data: orders, error: ordersError } = await supabase
+          .from('orders')
+          .select('*')
+          .in('id', orderIds)
+          .order('created_at', { ascending: false });
+
+        if (ordersError) throw ordersError;
+        ordersData = orders || [];
+      }
+
+      // Step 3: Get related products using the explicit product_id relationship
+      const productIds = orderItems ? [...new Set(orderItems.map(item => item.product_id))] : [];
+      let productsData = [];
+      
+      if (productIds.length > 0) {
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('*')
+          .in('id', productIds);
+
+        if (productsError) throw productsError;
+        productsData = products || [];
+      }
+
+      // Combine the data
+      const productMap = new Map(productsData.map(p => [p.id, p]));
+      const orderMap = new Map(ordersData.map(o => [o.id, o]));
+
       const uniqueOrders = [];
-      const orderMap = new Map();
+      const processedOrderIds = new Set();
 
       if (orderItems) {
         orderItems.forEach(item => {
-          if (item.orders && !orderMap.has(item.orders.id)) {
-            orderMap.set(item.orders.id, {
-              ...item.orders,
-              items: []
+          if (item.order_id && orderMap.has(item.order_id) && !processedOrderIds.has(item.order_id)) {
+            const order = orderMap.get(item.order_id);
+            processedOrderIds.add(item.order_id);
+            
+            // Get all items for this order
+            const orderItemsForOrder = orderItems.filter(oi => oi.order_id === item.order_id);
+            
+            uniqueOrders.push({
+              ...order,
+              items: orderItemsForOrder.map(oi => ({
+                ...oi,
+                products: productMap.get(oi.product_id) || { name: 'Unknown Product', image_url: null }
+              }))
             });
           }
-          if (item.orders) {
-            orderMap.get(item.orders.id).items.push(item);
-          }
         });
-        uniqueOrders.push(...orderMap.values());
       }
       
       setOrders(uniqueOrders);
 
+      // Calculate stats
       const totalSales = orderItems ? orderItems.reduce((sum, item) =>
         sum + (parseFloat(item.price_at_purchase || 0) * (item.quantity || 0)), 0
       ) : 0;
 
-      const { data: products } = await supabase
+      const { data: products, error: productsCountError } = await supabase
         .from('products')
         .select('id')
         .eq('seller_id', user.id);
+
+      if (productsCountError) throw productsCountError;
 
       setStats({
         totalSales,
@@ -246,7 +288,7 @@ const SellerDashboard = () => {
                           Date: {new Date(order.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ₹{
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                         order.status === 'pending' ? 'bg-amber-100 text-amber-800' :
                         order.status === 'processing' ? 'bg-rose-100 text-rose-800' :
                         order.status === 'shipped' ? 'bg-pink-100 text-pink-800' :

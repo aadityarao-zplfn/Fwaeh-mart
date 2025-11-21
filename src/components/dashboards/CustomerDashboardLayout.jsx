@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, ShoppingCart, Package, User, CreditCard, Store, Menu, X } from 'lucide-react'; // ✅ Added 'Store' icon
+import { Home, ShoppingBag, ShoppingCart, Package, User, CreditCard, Store, Menu, X } from 'lucide-react';
 
 const CustomerDashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -9,9 +9,10 @@ const CustomerDashboardLayout = ({ children }) => {
   const navItems = [
     { path: '/dashboard', label: 'Home', icon: Home },
     { path: '/products', label: 'Browse Products', icon: ShoppingBag },
-    { path: '/shops', label: 'Nearby Shops', icon: Store }, // ✅ NEW LINK ADDED HERE
+    { path: '/shops', label: 'Nearby Shops', icon: Store },
     { path: '/cart', label: 'My Cart', icon: ShoppingCart },
     { path: '/orders', label: 'My Orders', icon: Package },
+    { path: '/dashboard/orders', label: 'Order History', icon: Package },
     { path: '/payment-history', label: 'Payment History', icon: CreditCard }, 
     { path: '/profile', label: 'Profile', icon: User },
   ];

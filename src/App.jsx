@@ -21,6 +21,10 @@ import PaymentHistory from './pages/PaymentHistory';
 import Profile from './pages/Profile';
 import DashboardSettings from './pages/DashboardSettings';
 import Shops from './pages/Shops';
+import PaymentsPending from './pages/PaymentsPending';
+import ShippingStatus from './pages/ShippingStatus';
+import CustomerDashboard from './components/CustomerDashboard';
+import CustomerOrderHistory from './components/dashboards/CustomerOrderHistory'; // ✅ NEW IMPORT
 
 function App() {
   return (
@@ -102,6 +106,17 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Order History Route - FIXED */}
+            <Route
+              path="/dashboard/orders"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <CustomerOrderHistory />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/payment"
               element={
@@ -159,6 +174,29 @@ function App() {
               }
             />
 
+            {/* Retailer Payments (Case 3) */}
+              <Route path="/dashboard/payments" element={
+                <ProtectedRoute allowedRoles={['retailer']}>
+                  <RetailerDashboardLayout><PaymentsPending /></RetailerDashboardLayout>
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Retailer Shipping */}
+              <Route path="/dashboard/shipping" element={
+                <ProtectedRoute allowedRoles={['retailer']}>
+                  <RetailerDashboardLayout><ShippingStatus /></RetailerDashboardLayout>
+                </ProtectedRoute>
+              } 
+              />   
+
+              {/* Wholesaler Shipping */}
+              <Route path="/wholesaler/shipping" element={
+                <ProtectedRoute allowedRoles={['wholesaler']}>
+                  <WholesalerDashboardLayout><ShippingStatus /></WholesalerDashboardLayout>
+                </ProtectedRoute>
+              }
+              />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
