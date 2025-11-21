@@ -12,139 +12,139 @@ const ShippingStatus = () => {
 
   useEffect(() => {
     if (user && profile) {
-        fetchOrdersToShip();
+      fetchOrdersToShip();
+      
+      // Real-time subscription ONLY - no polling
+      const subscription = supabase
+        .channel('orders-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `status=eq.pending`
+          },
+          (payload) => {
+            console.log('🔔 Real-time order change detected:', payload);
+            fetchOrdersToShip();
+          }
+        )
+        .subscribe();
 
-        const subscription = supabase
-      .channel('orders-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'orders',
-          filter: `status=eq.pending`
-        },
-        (payload) => {
-          console.log('🔔 Real-time order change detected:', payload);
-          // Refresh the orders list
-          fetchOrdersToShip();
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscription
-    return () => {
-      subscription.unsubscribe();
-    };
+      return () => {
+        subscription.unsubscribe();
+      };
     }
   }, [user, profile]);
 
   const fetchOrdersToShip = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Fetching shipping tasks for:', profile?.role, user.id);
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // SIMPLIFIED DIRECT APPROACH
-      let query = supabase
+  
+      const { data: orderItems, error: itemsError } = await supabase
         .from('order_items')
-        .select(`
-          *,
-          orders!inner (
-            id,
-            created_at,
-            status,
-            shipping_address,
-            contact_phone,
-            contact_email,
-            wholesaler_fulfillment_order_id,
-            order_type,
-            shipped_at
-          ),
-          products!order_items_product_id_fkey(
-            name,
-            image_url,
-            is_proxy
-          )
-        `)
-        .eq('orders.status', 'pending');
-
-      // Add role-specific filters
-      if (profile?.role === 'retailer') {
-        query = query.eq('seller_id', user.id);
-      } else if (profile?.role === 'wholesaler') {
-        // Wholesalers see their own items OR fulfillment orders
-        query = query.or(`seller_id.eq.${user.id},orders.wholesaler_fulfillment_order_id.not.is.null`);
-      }
-
-      const { data: orderItems, error } = await query;
-      
-      if (error) throw error;
-
-      console.log('📦 Found order items:', orderItems?.length);
-
+        .select('*')
+        .eq('seller_id', user.id)
+        .order('created_at', { ascending: false });
+  
+      if (itemsError) throw itemsError;
+  
       if (!orderItems || orderItems.length === 0) {
         setOrders([]);
         return;
       }
-
-      // Group order items by order
-      const ordersMap = new Map();
-      
+  
+      const orderIds = [...new Set(orderItems.map(item => item.order_id))];
+  
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .in('id', orderIds)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
+  
+      if (ordersError) throw ordersError;
+  
+      const productIds = [...new Set(orderItems.map(item => item.product_id))];
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', productIds);
+  
+      if (productsError) console.log('⚠️ Products fetch error:', productsError);
+  
+      const productMap = new Map(products?.map(p => [p.id, p]) || []);
+      const itemsMap = new Map();
+  
       orderItems.forEach(item => {
-        const orderId = item.orders.id;
-        
-        if (!ordersMap.has(orderId)) {
-          ordersMap.set(orderId, {
-            ...item.orders,
-            order_items: []
-          });
+        if (!itemsMap.has(item.order_id)) {
+          itemsMap.set(item.order_id, []);
         }
-        
-        ordersMap.get(orderId).order_items.push({
+        itemsMap.get(item.order_id).push({
           ...item,
-          products: item.products || { name: 'Unknown Product', image_url: null, is_proxy: false }
+          products: productMap.get(item.product_id) || { 
+            name: 'Unknown Product', 
+            image_url: null,
+            is_proxy: false
+          }
         });
       });
-
-      const combinedOrders = Array.from(ordersMap.values());
-      console.log('✅ Final combined orders:', combinedOrders.length);
+  
+      const combinedOrders = ordersData.map(order => ({
+        ...order,
+        order_items: itemsMap.get(order.id) || []
+      }));
+  
       setOrders(combinedOrders);
-
+  
     } catch (error) {
       console.error('❌ Error fetching shipping tasks:', error);
-      console.error('Error details:', error);
       toast.error('Failed to load shipping tasks');
     } finally {
       setLoading(false);
     }
   };
 
-  // ... rest of your handleShipOrder and JSX remains the same
   const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
     const toastId = toast.loading('Dispatching order...');
 
     try {
       const timestamp = new Date().toISOString();
       
+      // FIRST: Check if 'in_transit' is allowed by temporarily using 'shipped'
+      let statusToUse = 'in_transit';
+      
+      // Try 'in_transit' first, fallback to 'shipped' if it fails
       const { error: updateError } = await supabase
         .from('orders')
         .update({ 
-          status: 'in_transit', 
+          status: statusToUse,
           shipped_at: timestamp 
         })
         .eq('id', orderId);
 
-      if (updateError) throw updateError;
+      // If 'in_transit' fails, try 'shipped'
+      if (updateError && updateError.code === '23514') {
+        statusToUse = 'shipped';
+        const { error: retryError } = await supabase
+          .from('orders')
+          .update({ 
+            status: statusToUse,
+            shipped_at: timestamp 
+          })
+          .eq('id', orderId);
+        
+        if (retryError) throw retryError;
+      } else if (updateError) {
+        throw updateError;
+      }
 
-      // If this is a proxy fulfillment order, also update the original customer order
       if (linkedOrderId) {
-        console.log('🔗 Updating linked customer order:', linkedOrderId);
         const { error: linkedError } = await supabase
           .from('orders')
           .update({ 
-            status: 'in_transit',
+            status: statusToUse,
             shipped_at: timestamp 
           })
           .eq('id', linkedOrderId);
@@ -152,12 +152,11 @@ const ShippingStatus = () => {
         if (linkedError) throw linkedError;
       }
 
-      toast.success('Order dispatched! Status: In Transit', { id: toastId });
+      toast.success(`Order dispatched! Status: ${statusToUse === 'in_transit' ? 'In Transit' : 'Shipped'}`, { id: toastId });
       setOrders(prev => prev.filter(o => o.id !== orderId));
 
       // Auto-delivery after 3 minutes
       setTimeout(async () => {
-        console.log('🚚 Auto-delivering order:', orderId);
         const { error: deliverError } = await supabase
           .from('orders')
           .update({ status: 'delivered' })
@@ -179,7 +178,7 @@ const ShippingStatus = () => {
 
     } catch (error) {
       console.error('Shipping error:', error);
-      toast.error('Failed to update status', { id: toastId });
+      toast.error('Failed to update status: ' + error.message, { id: toastId });
     }
   };
 

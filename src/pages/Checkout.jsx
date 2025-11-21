@@ -134,12 +134,15 @@ const Checkout = () => {
       contact_name: shippingInfo.fullName,
     };
 
-    const orderItemsData = cartItems.map((item) => ({
-      product_id: item.product_id,
-      seller_id: item.products.seller_id,
-      quantity: item.quantity,
-      price_at_purchase: item.products.price,
-    }));
+    // FIXED: Include wholesaler_price in order items
+const orderItemsData = cartItems.map((item) => ({
+  product_id: item.product_id,
+  seller_id: item.products.seller_id,
+  quantity: item.quantity,
+  price_at_purchase: item.products.price,
+  // CRITICAL: Copy wholesaler_price for proxy product payments
+  wholesaler_price: item.products.wholesaler_price || null,
+}));
 
     navigate('/payment', { 
       state: { 

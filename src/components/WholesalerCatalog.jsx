@@ -134,27 +134,29 @@ const WholesalerCatalog = () => {
 
       } else {
         // --- CREATE NEW PRODUCT ---
-        
-        const { error } = await supabase.from('products').insert([
-          {
-            seller_id: user.id,
-            name: wholesalerProduct.name,
-            description: wholesalerProduct.description,
-            category: wholesalerProduct.category,
-            image_url: wholesalerProduct.image_url,
-            
-            // Custom fields
-            price: importPrice,
-            stock_quantity: importQty,
-            
-            // Linking fields
-            is_public: true,
-            is_proxy: true,
-            wholesaler_product_id: wholesalerProduct.id,
-            wholesaler_id: wholesalerProduct.seller_id,
-            is_active: true
-          }
-        ]);
+const { error } = await supabase.from('products').insert([
+  {
+    seller_id: user.id,
+    name: wholesalerProduct.name,
+    description: wholesalerProduct.description,
+    category: wholesalerProduct.category,
+    image_url: wholesalerProduct.image_url,
+    
+    // Custom fields
+    price: importPrice, // Retailer's selling price
+    stock_quantity: importQty,
+    
+    // CRITICAL FIX: Add wholesaler_price for payments
+    wholesaler_price: wholesalerProduct.price, // Original wholesaler price
+    
+    // Linking fields
+    is_public: true,
+    is_proxy: true,
+    wholesaler_product_id: wholesalerProduct.id,
+    wholesaler_id: wholesalerProduct.seller_id,
+    is_active: true
+  }
+]);
 
         if (error) throw error;
         toast.success(`${wholesalerProduct.name} imported successfully!`);

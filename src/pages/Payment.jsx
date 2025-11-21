@@ -89,7 +89,8 @@ throw new Error(`Failed to create order: ${orderError.message}`);
     product_id: item.product_id,
     seller_id: item.seller_id,
     quantity: item.quantity,
-    price_at_purchase: item.price_at_purchase
+    price_at_purchase: item.price_at_purchase,
+    wholesaler_price: item.wholesaler_price,
   }));
 
   const { error: itemsError } = await supabase

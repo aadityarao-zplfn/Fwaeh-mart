@@ -39,7 +39,7 @@ const PaymentsPending = () => {
         .from('products')
         .select('*')
         .in('id', productIds)
-        .eq('is_proxy', true); // Only get proxy products
+        .eq('is_proxy', true);
 
       if (productsError) throw productsError;
 
@@ -76,6 +76,7 @@ const PaymentsPending = () => {
           orders: orderMap.get(item.order_id)
         }));
 
+      console.log('🔍 Combined proxy items:', combinedItems); // Debug log
       setPendingItems(combinedItems);
     } catch (error) {
       console.error('Error fetching pending payments:', error);
@@ -86,7 +87,14 @@ const PaymentsPending = () => {
   };
 
   const handlePayment = async (item) => {
-    if (!confirm(`Confirm payment to Wholesaler for ${item.products.name}?`)) return;
+    // Validate price before proceeding
+    const costPrice = item.wholesaler_price;
+    if (!costPrice || isNaN(costPrice)) {
+      toast.error('Invalid product price. Cannot process payment.');
+      return;
+    }
+
+    if (!confirm(`Confirm payment of ₹${(costPrice * item.quantity).toFixed(2)} to Wholesaler for ${item.products.name}?`)) return;
     
     setProcessingId(item.id);
     const toastId = toast.loading('Processing payment to wholesaler...');
@@ -131,9 +139,15 @@ const PaymentsPending = () => {
       ) : (
         <div className="grid gap-4">
           {pendingItems.map((item) => {
-            // CRITICAL: Use actual wholesaler price, not calculated
-            const costPrice = item.products.wholesaler_price;
+            // SAFE CALCULATION: Handle null/undefined prices
+            const costPrice = parseFloat(item.wholesaler_price) || 0;
             const totalCost = costPrice * item.quantity;
+            
+            // Skip items with invalid prices
+            if (costPrice <= 0) {
+              console.warn('Invalid price for item:', item);
+              return null;
+            }
 
             return (
               <div key={item.id} className="bg-white p-6 rounded-2xl shadow-md border border-red-100">
@@ -151,7 +165,7 @@ const PaymentsPending = () => {
                   <div className="text-right px-4 border-l border-gray-100">
                     <p className="text-xs text-gray-500 uppercase font-bold">Amount Due</p>
                     <p className="text-2xl font-bold text-red-600">₹{totalCost.toFixed(2)}</p>
-                    <p className="text-xs text-gray-500">{item.quantity} × ₹{costPrice}</p>
+                    <p className="text-xs text-gray-500">{item.quantity} × ₹{costPrice.toFixed(2)}</p>
                   </div>
                   <button
                     onClick={() => handlePayment(item)}
