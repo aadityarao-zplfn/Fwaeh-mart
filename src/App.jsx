@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
-
+import RetailerNetwork from './pages/RetailerNetwork';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -78,6 +78,16 @@ function App() {
                   <RoleSelection />
                 </ProtectedRoute>
               }
+            />
+            <Route
+               path="/dashboard/retailers"
+               element={
+                 <ProtectedRoute allowedRoles={['wholesaler']}>
+                   <WholesalerDashboardLayout>
+                     <RetailerNetwork />
+                   </WholesalerDashboardLayout>
+                 </ProtectedRoute>
+             }
             />
 
             {/* Customer Routes */}
