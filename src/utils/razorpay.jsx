@@ -43,4 +43,6 @@ export const initiatePayment = async (orderDetails, userInfo, onSuccess, onFailu
 
   const razorpay = new window.Razorpay(options);
   razorpay.open();
+  console.log('Razorpay Key:', import.meta.env.VITE_RAZORPAY_KEY_ID); // Add this line
+
 };
