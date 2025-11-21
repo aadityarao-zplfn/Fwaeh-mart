@@ -8,7 +8,7 @@ const CustomerDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-pink-500 to-pink-600 rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-r from-rose-400 to-rose-400 rounded-2xl p-6 text-white">
         <h2 className="text-2xl font-bold mb-2">Welcome to Your Dashboard!</h2>
         <p className="opacity-90">Manage your orders, track shipments, and view your account details.</p>
       </div>

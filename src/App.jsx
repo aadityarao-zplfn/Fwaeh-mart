@@ -24,11 +24,10 @@ import Shops from './pages/Shops';
 import PaymentsPending from './pages/paymentsPending';
 import ShippingStatus from './pages/shippingStatus';
 import CustomerDashboard from './components/CustomerDashboard';
-import CustomerOrderHistory from './components/dashboards/CustomerOrderHistory'; // ✅ NEW IMPORT
+import CustomerOrderHistory from './components/dashboards/CustomerOrderHistory';
 import SchedulePickup from './pages/SchedulePickup';
 import PickupSuccess from './pages/PickupSuccess';
-
-
+import QueriesPage from './pages/QueriesPage';
 
 function App() {
   return (
@@ -110,7 +109,20 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* Order History Route - FIXED */}
+
+            {/* Queries Route */}
+            <Route 
+              path="/dashboard/queries" 
+              element={
+                <ProtectedRoute allowedRoles={['retailer']}>
+                  <RetailerDashboardLayout>
+                    <QueriesPage />
+                  </RetailerDashboardLayout>
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Order History Route */}
             <Route
               path="/dashboard/orders"
               element={
@@ -167,7 +179,7 @@ function App() {
             />
 
             {/* Wholesaler Settings */}
-             <Route
+            <Route
               path="/wholesaler/settings"
               element={
                 <ProtectedRoute allowedRoles={['wholesaler']}>
@@ -178,49 +190,61 @@ function App() {
               }
             />
 
-            {/* Retailer Payments (Case 3) */}
-              <Route path="/dashboard/payments" element={
+            {/* Retailer Payments */}
+            <Route 
+              path="/dashboard/payments" 
+              element={
                 <ProtectedRoute allowedRoles={['retailer']}>
-                  <RetailerDashboardLayout><PaymentsPending /></RetailerDashboardLayout>
+                  <RetailerDashboardLayout>
+                    <PaymentsPending />
+                  </RetailerDashboardLayout>
                 </ProtectedRoute>
               } 
             />
 
             {/* Retailer Shipping */}
-              <Route path="/dashboard/shipping" element={
+            <Route 
+              path="/dashboard/shipping" 
+              element={
                 <ProtectedRoute allowedRoles={['retailer']}>
-                  <RetailerDashboardLayout><ShippingStatus /></RetailerDashboardLayout>
+                  <RetailerDashboardLayout>
+                    <ShippingStatus />
+                  </RetailerDashboardLayout>
                 </ProtectedRoute>
               } 
-              />   
+            />   
 
-              {/* Wholesaler Shipping */}
-              <Route path="/wholesaler/shipping" element={
+            {/* Wholesaler Shipping */}
+            <Route 
+              path="/wholesaler/shipping" 
+              element={
                 <ProtectedRoute allowedRoles={['wholesaler']}>
-                  <WholesalerDashboardLayout><ShippingStatus /></WholesalerDashboardLayout>
+                  <WholesalerDashboardLayout>
+                    <ShippingStatus />
+                  </WholesalerDashboardLayout>
                 </ProtectedRoute>
               }
-              />
+            />
 
-              <Route 
-  path="/schedule-pickup" 
-  element={
-    <ProtectedRoute allowedRoles={['customer']}>
-      <CustomerDashboardLayout>
-        <SchedulePickup />
-      </CustomerDashboardLayout>
-    </ProtectedRoute>
-  } 
-/>
-<Route 
-  path="/pickup-success" 
-  element={
-    <ProtectedRoute allowedRoles={['customer']}>
-      <PickupSuccess />
-    </ProtectedRoute>
-  } 
-/>
-
+            {/* Pickup Routes */}
+            <Route 
+              path="/schedule-pickup" 
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerDashboardLayout>
+                    <SchedulePickup />
+                  </CustomerDashboardLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/pickup-success" 
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <PickupSuccess />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
