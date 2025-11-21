@@ -133,6 +133,11 @@ const processOrder = async (status = 'pending') => {
 };
   // Handle Razorpay payment
 const handleRazorpayPayment = async () => {
+    console.log('🔍 DEBUG: handleRazorpayPayment called');
+  console.log('🔍 DEBUG: paymentMethod is:', paymentMethod);
+  console.log('🔍 DEBUG: Vercel check would be:', window.location.hostname.includes('vercel.app'));
+  console.log('🔍 DEBUG: Razorpay key exists:', !!import.meta.env.VITE_RAZORPAY_KEY_ID);
+
 
   // 🎯 LOCALHOST - USE REAL RAZORPAY
   const res = await loadRazorpay();
