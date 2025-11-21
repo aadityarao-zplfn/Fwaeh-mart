@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Heart, ArrowRight, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Store } from 'lucide-react';
 
 const Cart = () => {
   const [cartItems, setCartItems] = useState([]);
@@ -440,23 +441,38 @@ const Cart = () => {
                 </div>
 
                 {/* Buttons - FIXED Arrow Position */}
-                <div className="space-y-3">
-                  <button
-                    onClick={handleCheckout}
-                    className="w-full py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3"
-                    style={{ background: 'linear-gradient(135deg, #e57373 0%, #ef9a9a 100%)' }}
-                  >
-                    <span>Proceed to Checkout</span>
-                    <ArrowRight size={18} className="ml-1" />
-                  </button>
-                  <button
-                    onClick={() => navigate('/products')}
-                    className="w-full py-3 rounded-xl font-bold transition-all hover:opacity-80 text-sm"
-                    style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
-                  >
-                    Continue Shopping
-                  </button>
-                </div>
+               <div className="space-y-3">
+  <button
+    onClick={handleCheckout}
+    className="w-full py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3"
+    style={{ background: 'linear-gradient(135deg, #e57373 0%, #ef9a9a 100%)' }}
+  >
+    <span>Proceed to Checkout (Online)</span>
+    <ArrowRight size={18} className="ml-1" />
+  </button>
+
+  {/* 🆕 NEW OFFLINE BUTTON */}
+  <button
+    onClick={() => navigate('/schedule-pickup')}
+    className="w-full py-3 rounded-xl font-bold transition-all hover:opacity-80 text-sm flex items-center justify-center gap-2 border-2"
+    style={{ 
+      background: '#fff', 
+      color: '#b91c1c', 
+      borderColor: '#b91c1c' 
+    }}
+  >
+    <Store size={18} />
+    Offline Pick-up (Schedule)
+  </button>
+
+  <button
+    onClick={() => navigate('/products')}
+    className="w-full py-3 rounded-xl font-bold transition-all hover:opacity-80 text-sm"
+    style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
+  >
+    Continue Shopping
+  </button>
+</div>
 
                 {/* Security Badges */}
                 <div className="mt-6 pt-4 border-t" style={{ borderColor: '#f8b4b4' }}>

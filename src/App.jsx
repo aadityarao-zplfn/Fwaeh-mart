@@ -25,6 +25,10 @@ import PaymentsPending from './pages/paymentsPending';
 import ShippingStatus from './pages/shippingStatus';
 import CustomerDashboard from './components/CustomerDashboard';
 import CustomerOrderHistory from './components/dashboards/CustomerOrderHistory'; // ✅ NEW IMPORT
+import SchedulePickup from './pages/SchedulePickup';
+import PickupSuccess from './pages/PickupSuccess';
+
+
 
 function App() {
   return (
@@ -197,6 +201,26 @@ function App() {
                 </ProtectedRoute>
               }
               />
+
+              <Route 
+  path="/schedule-pickup" 
+  element={
+    <ProtectedRoute allowedRoles={['customer']}>
+      <CustomerDashboardLayout>
+        <SchedulePickup />
+      </CustomerDashboardLayout>
+    </ProtectedRoute>
+  } 
+/>
+<Route 
+  path="/pickup-success" 
+  element={
+    <ProtectedRoute allowedRoles={['customer']}>
+      <PickupSuccess />
+    </ProtectedRoute>
+  } 
+/>
+
           </Routes>
         </BrowserRouter>
       </AuthProvider>
