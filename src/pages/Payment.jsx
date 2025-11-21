@@ -133,26 +133,6 @@ const processOrder = async (status = 'pending') => {
 };
   // Handle Razorpay payment
 const handleRazorpayPayment = async () => {
-  // 🎯 CHECK IF ON VERCEL - USE SIMULATION
-  if (window.location.hostname.includes('vercel.app')) {
-    const toastId = toast.loading('Placing your order...');
-    
-    try {
-      // Simulate payment processing (2 seconds)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // 🚨 THIS IS THE KEY PART - ORDER STILL GETS PLACED!
-      await processOrder('pending');
-      
-      toast.success('Order placed successfully! (Demo Mode)', { id: toastId });
-      navigate('/orders');
-    } catch (error) {
-      console.error('ORDER PROCESSING FAILED:', error);
-      toast.error(`Order failed: ${error.message}`, { id: toastId });
-      setLoading(false);
-    }
-    return;
-  }
 
   // 🎯 LOCALHOST - USE REAL RAZORPAY
   const res = await loadRazorpay();
