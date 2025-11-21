@@ -16,9 +16,44 @@ export default function OrderTrackingPage() {
   const [submittingQuery, setSubmittingQuery] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => { 
-    fetchOrders(); 
-  }, []);
+  // Add this inside your OrderTrackingPage component
+useEffect(() => {
+  // 1. Subscribe to ALL changes in the 'orders' table
+  const subscription = supabase
+    .channel('public:orders')
+    .on(
+      'postgres_changes',
+      { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'orders',
+        // Optional: Filter for current user's orders only if you have the user ID handy
+        // filter: `user_id=eq.${user?.id}` 
+      },
+      (payload) => {
+        console.log('🔴 Real-time update received:', payload);
+        
+        // 2. When a change happens, update the local state automatically
+        setOrders(currentOrders => 
+          currentOrders.map(order => 
+            order.id === payload.new.id 
+              ? { ...order, ...payload.new } 
+              : order
+          )
+        );
+        
+        // Also update the selected order view if open
+        if (selectedOrder && selectedOrder.id === payload.new.id) {
+           setSelectedOrder(prev => ({ ...prev, ...payload.new }));
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}, [selectedOrder]); // Dependency array
 
   const fetchOrders = async () => {
     try {

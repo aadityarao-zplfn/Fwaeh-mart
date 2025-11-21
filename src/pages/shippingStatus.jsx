@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Truck, Box, MapPin, Clock, ArrowUpRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { sendDeliveryEmail } from '../utils/emailService';
+//import { sendDeliveryEmail } from '../utils/emailService';
 
 const ShippingStatus = () => {
   const [orders, setOrders] = useState([]);
@@ -106,55 +106,45 @@ const ShippingStatus = () => {
       setLoading(false);
     }
   };
+    // src/pages/shippingStatus.jsx
 
-  const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
+const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
     const toastId = toast.loading('Dispatching order...');
-
+  
     try {
       const timestamp = new Date().toISOString();
       
-      // FIRST: Check if 'in_transit' is allowed by temporarily using 'shipped'
-      let statusToUse = 'in_transit';
-      
-      // Try 'in_transit' first, fallback to 'shipped' if it fails
+      // 1. Update status to 'in_transit' and set the timestamp
+      // Your Database Cron Job will see this timestamp and mark it 'delivered' after 3 mins
       const { error: updateError } = await supabase
         .from('orders')
         .update({ 
-          status: statusToUse,
+          status: 'in_transit',
           shipped_at: timestamp 
         })
         .eq('id', orderId);
-
-      // If 'in_transit' fails, try 'shipped'
-      if (updateError && updateError.code === '23514') {
-        statusToUse = 'shipped';
-        const { error: retryError } = await supabase
-          .from('orders')
-          .update({ 
-            status: statusToUse,
-            shipped_at: timestamp 
-          })
-          .eq('id', orderId);
-        
-        if (retryError) throw retryError;
-      } else if (updateError) {
-        throw updateError;
-      }
-
+  
+      if (updateError) throw updateError;
+  
+      // 2. Handle linked order (if any)
       if (linkedOrderId) {
         const { error: linkedError } = await supabase
           .from('orders')
           .update({ 
-            status: statusToUse,
+            status: 'in_transit',
             shipped_at: timestamp 
           })
           .eq('id', linkedOrderId);
         
         if (linkedError) throw linkedError;
       }
-
-      toast.success(`Order dispatched! Status: ${statusToUse === 'in_transit' ? 'In Transit' : 'Shipped'}`, { id: toastId });
+  
+      // 3. Success Message
+      toast.success('Order dispatched! It will auto-complete in 3 minutes.', { id: toastId });
+      
+      // 4. Update UI instantly
       setOrders(prev => prev.filter(o => o.id !== orderId));
+<<<<<<< Updated upstream
 
       // Auto-delivery after 3 minutes
       // Auto-delivery after 3 minutes
@@ -248,6 +238,12 @@ setTimeout(async () => {
   }
 }, 180000); // 3 minutes
 
+=======
+  
+      // ❌ THE TIMEOUT BLOCK IS COMPLETELY REMOVED
+      // The "3 minute logic" is now safely running inside your database.
+  
+>>>>>>> Stashed changes
     } catch (error) {
       console.error('Shipping error:', error);
       toast.error('Failed to update status: ' + error.message, { id: toastId });

@@ -1,5 +1,5 @@
 // src/utils/emailService.jsx
-import toast from 'react-hot-toast';
+/*import toast from 'react-hot-toast';
 
 export const sendDeliveryEmail = async (order, orderItems = []) => {
   try {
@@ -47,4 +47,4 @@ export const sendDeliveryEmail = async (order, orderItems = []) => {
     console.error('❌ Email service error:', error);
     return { success: false, error: error.message };
   }
-};
+};*/
