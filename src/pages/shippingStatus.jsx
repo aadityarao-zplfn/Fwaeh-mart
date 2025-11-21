@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Truck, Box, MapPin, Clock, ArrowUpRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { sendDeliveryEmail } from '../utils/emailService';
 
 const ShippingStatus = () => {
   const [orders, setOrders] = useState([]);
@@ -163,6 +164,22 @@ const ShippingStatus = () => {
           .eq('id', orderId);
         
         if (deliverError) console.error('Delivery update failed:', deliverError);
+
+        const { data: fullOrder } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('*, products(name, price)')
+        .eq('order_id', orderId);
+
+      if (fullOrder && orderItems) {
+        sendDeliveryEmail(fullOrder, orderItems);
+        toast.success(`📧 Delivery confirmation sent to customer!`);
+      }
 
         if (linkedOrderId) {
           const { error: linkedDeliverError } = await supabase
