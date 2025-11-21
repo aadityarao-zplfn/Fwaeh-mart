@@ -144,6 +144,10 @@ const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
       
       // 4. Update UI instantly
       setOrders(prev => prev.filter(o => o.id !== orderId));
+  
+      // ❌ THE TIMEOUT BLOCK IS COMPLETELY REMOVED
+      // The "3 minute logic" is now safely running inside your database.
+  
     } catch (error) {
       console.error('Shipping error:', error);
       toast.error('Failed to update status: ' + error.message, { id: toastId });

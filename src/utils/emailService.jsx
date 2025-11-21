@@ -47,4 +47,8 @@ export const sendDeliveryEmail = async (order, orderItems = []) => {
     console.error('❌ Email service error:', error);
     return { success: false, error: error.message };
   }
+<<<<<<< Updated upstream
 };*/
+=======
+};*/
+>>>>>>> Stashed changes
