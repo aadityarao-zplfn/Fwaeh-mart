@@ -1,13 +1,82 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Plus, ShoppingCart, Store, Clock, Calendar, HelpCircle } from 'lucide-react';
+import { X, Minus, Plus, ShoppingCart, Store, Clock, Calendar, HelpCircle, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [productReviews, setProductReviews] = useState([]);
+  const [averageRating, setAverageRating] = useState(0);
   const { profile: userProfile } = useAuth();
+
+  // Fetch reviews for this product
+  // Fetch reviews for this product
+  useEffect(() => {
+    const fetchProductReviews = async () => {
+      if (!product?.id) {
+        console.log('❌ No product ID');
+        return;
+      }
+      
+      console.log('🔄 Fetching reviews for product:', product.id, product.name);
+      
+      try {
+        // First, let's try without the user join to see if that's the issue
+        const { data, error } = await supabase
+          .from('product_reviews')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching reviews:', error);
+          throw error;
+        }
+
+        console.log('✅ Reviews fetched:', data);
+        setProductReviews(data || []);
+        
+        // Calculate average rating
+        if (data && data.length > 0) {
+          const avg = data.reduce((sum, review) => sum + review.rating, 0) / data.length;
+          console.log('📊 Average rating calculated:', avg);
+          setAverageRating(avg);
+        } else {
+          console.log('📊 No reviews, setting average to 0');
+          setAverageRating(0);
+        }
+      } catch (error) {
+        console.error('❌ Error in fetchProductReviews:', error);
+      }
+    };
+
+    fetchProductReviews();
+  }, [product]);
+
+  const StarRatingDisplay = ({ rating, size = 16 }) => {
+    console.log('⭐ Rendering stars with rating:', rating);
+    return (
+      <div className="flex items-center gap-1">
+        <div className="flex gap-0.5">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+              key={star}
+              size={size}
+              className={
+                star <= Math.round(rating) 
+                  ? "text-yellow-400 fill-yellow-400" 
+                  : "text-gray-300"
+              }
+            />
+          ))}
+        </div>
+        <span className="text-sm text-gray-600">({rating.toFixed(1)})</span>
+      </div>
+    );
+  };
 
   const getSellerProfile = () => {
     if (!product) return null;
@@ -54,10 +123,11 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
 
   const isRetailerOrWholesaler = userProfile?.role === 'retailer' || userProfile?.role === 'wholesaler';
   
-  // Helper for display text
   const restockText = product.restock_days === -1 
     ? "Availability Uncertain" 
     : `Restocking in ${product.restock_days} days`;
+
+  console.log('🎯 Final render state - Reviews:', productReviews, 'Avg Rating:', averageRating);
 
   return (
     <>
@@ -166,7 +236,6 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                   <div className="text-right">
                     <span className="block font-bold text-red-500">Out of Stock</span>
                     
-                    {/* 🚀 NEW RESTOCK ALERT */}
                     {product.restock_days && (
                       <span className="flex items-center justify-end gap-1 text-sm font-bold text-orange-600 mt-1">
                         {product.restock_days === -1 ? <HelpCircle size={14} /> : <Clock size={14} />}
@@ -229,8 +298,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                     Adding...
                   </>
                 ) : product.stock_quantity === 0 ? (
-                  // 🚀 Customized Button Text
-                   product.restock_days ? (
+                  product.restock_days ? (
                     <span className="flex items-center">
                       {product.restock_days === -1 ? (
                           <> <HelpCircle className="mr-2" /> Check Back Later </>
@@ -247,6 +315,47 @@ const ProductDetailModal = ({ product, onClose, onAddToCart }) => {
                 )}
               </button>
             )}
+          </div>
+
+          {/* Reviews Section */}
+          <div 
+            className="rounded-2xl p-6 shadow-lg border-2"
+            style={{ background: '#fff5f5', borderColor: '#fca5a5' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold" style={{ color: '#b91c1c' }}>Customer Reviews</h3>
+              <div className="text-right">
+                <div className="flex items-center gap-2">
+                  <StarRatingDisplay rating={averageRating} size={20} />
+                  <span className="font-bold" style={{ color: '#b91c1c' }}>
+                    ({productReviews.length} reviews)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+                  {productReviews.length === 0 ? (
+            <p className="text-center py-4" style={{ color: '#dc2626' }}>
+              No reviews yet. Be the first to review!
+            </p>
+          ) : (
+            <div className="space-y-4 max-h-60 overflow-y-auto">
+              {productReviews.map((review) => (
+                <div key={review.id} className="pb-4 border-b border-gray-200 last:border-0">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold" style={{ color: '#b91c1c' }}>
+                      Customer
+                    </span>
+                    <StarRatingDisplay rating={review.rating} size={16} />
+                  </div>
+                  <p className="text-gray-700">{review.comment}</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {new Date(review.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
           </div>
 
           {/* Seller Information Card */}

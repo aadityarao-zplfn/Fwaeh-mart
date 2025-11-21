@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useAuth } from "../contexts/AuthContext"
 import { calculateDistance, formatDistance } from "../utils/location"
 
-const ProductCard = ({ product, onAddToCart, userLocation }) => {
+const ProductCard = ({ product, onAddToCart, userLocation, rating, reviewCount }) => {
   const [isLoading, setIsLoading] = useState(false)
   const { profile } = useAuth()
 
@@ -110,6 +110,23 @@ const ProductCard = ({ product, onAddToCart, userLocation }) => {
             </span>
           </div>
         </div>
+                {/* ADD STAR RATING RIGHT HERE */}
+<div className="flex items-center gap-1 mt-2">
+  {[1, 2, 3, 4, 5].map((star) => (
+    <svg
+      key={star}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={star <= (rating || 0) ? "#fbbf24" : "none"}
+      stroke={star <= (rating || 0) ? "#fbbf24" : "#d1d5db"}
+      strokeWidth="2"
+    >
+      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+    </svg>
+  ))}
+  <span className="text-sm text-gray-600 ml-1">({reviewCount || 0})</span>
+</div>
 
         {sellerData && (
           <div className="flex items-center pt-3 border-t-2" style={{ borderColor: '#E8B4B8' }}>

@@ -108,6 +108,8 @@ const Products = () => {
       );
 
       setProducts(filteredData);
+          fetchAllProductsWithReviews(filteredData);
+
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to load products');
@@ -115,6 +117,34 @@ const Products = () => {
       setLoading(false);
     }
   };
+
+ const fetchAllProductsWithReviews = async (productsToUpdate) => {
+  try {
+    const { data: allReviews, error } = await supabase
+      .from('product_reviews')
+      .select('*');
+    
+    if (error) throw error;
+
+    // Calculate ratings for each product
+    const productsWithRatings = productsToUpdate.map(product => {
+      const productReviews = allReviews.filter(review => review.product_id === product.id);
+      const averageRating = productReviews.length > 0 
+        ? productReviews.reduce((sum, review) => sum + review.rating, 0) / productReviews.length 
+        : 0;
+      
+      return {
+        ...product,
+        rating: averageRating,
+        review_count: productReviews.length
+      };
+    });
+
+    setProducts(productsWithRatings);
+  } catch (error) {
+    console.error('Error fetching reviews:', error);
+  }
+};
 
   const categories = useMemo(() => {
     return [...new Set(products.map(p => p.category))];
@@ -675,11 +705,13 @@ const Products = () => {
                 onClick={() => setSelectedProduct(product)}
                 className="cursor-pointer"
               >
-                <ProductCard
-                  product={product}
-                  onAddToCart={addToCart}
-                  userLocation={userLocation}
-                />
+<ProductCard
+  product={product}
+  onAddToCart={addToCart}
+  userLocation={userLocation}
+  rating={product.rating || 0}
+  reviewCount={product.review_count || 0}
+/>
               </div>
             ))}
           </div>
