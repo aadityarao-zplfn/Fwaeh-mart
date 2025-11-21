@@ -158,60 +158,95 @@ const ShippingStatus = () => {
 
       // Auto-delivery after 3 minutes
       // Auto-delivery after 3 minutes
+// In the setTimeout callback - replace with this detailed version
 setTimeout(async () => {
-    try {
-      // Update order status to delivered
-      const { error: deliverError } = await supabase
-        .from('orders')
-        .update({ status: 'delivered' })
-        .eq('id', orderId);
+  console.log('🚚 Starting auto-delivery process for order:', orderId);
+  
+  try {
+    // Update order status to delivered
+    console.log('📝 Updating order status to "delivered"');
+    const { error: deliverError } = await supabase
+      .from('orders')
+      .update({ status: 'delivered' })
+      .eq('id', orderId);
+    
+    if (deliverError) {
+      console.error('❌ Delivery update failed:', deliverError);
+      return;
+    }
+    console.log('✅ Order status updated to delivered');
+
+    // Wait a moment for the update to propagate
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Fetch the updated order
+    console.log('📦 Fetching updated order data');
+    const { data: fullOrder, error: fetchError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    if (fetchError) {
+      console.error('❌ Failed to fetch updated order:', fetchError);
+      return;
+    }
+
+    console.log('📊 Order status after update:', fullOrder?.status);
+    console.log('📧 Order email:', fullOrder?.contact_email);
+
+    // Only send email if order is actually delivered
+    if (fullOrder && fullOrder.status === 'delivered') {
+      console.log('✅ Order confirmed as delivered, fetching order items...');
       
-      if (deliverError) {
-        console.error('Delivery update failed:', deliverError);
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*, products(name, price)')
+        .eq('order_id', orderId);
+
+      if (itemsError) {
+        console.error('❌ Failed to fetch order items:', itemsError);
         return;
       }
-  
-      // ✅ RACE CONDITION FIX: Add small delay and verify status
-      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      console.log('📦 Order items found:', orderItems?.length);
       
-      // Fetch the updated order with verified status
-      const { data: fullOrder } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .single();
-  
-      // Only send email if order is actually delivered
-      if (fullOrder && fullOrder.status === 'delivered') {
-        const { data: orderItems } = await supabase
-          .from('order_items')
-          .select('*, products(name, price)')
-          .eq('order_id', orderId);
-  
-        if (orderItems) {
-          await sendDeliveryEmail(fullOrder, orderItems);
+      if (orderItems && orderItems.length > 0) {
+        console.log('📧 Calling sendDeliveryEmail...');
+        const emailResult = await sendDeliveryEmail(fullOrder, orderItems);
+        console.log('📧 Email result:', emailResult);
+        
+        if (emailResult.success) {
           toast.success(`📧 Delivery confirmation sent to customer!`);
+        } else {
+          console.error('❌ Email service failed:', emailResult.error);
+          toast.error('Failed to send delivery email');
         }
       } else {
-        console.warn('Order status not updated to delivered, skipping email');
+        console.warn('⚠️ No order items found, skipping email');
       }
-  
-      // Handle linked order if it exists
-      if (linkedOrderId) {
-        const { error: linkedDeliverError } = await supabase
-          .from('orders')
-          .update({ status: 'delivered' })
-          .eq('id', linkedOrderId);
-        
-        if (linkedDeliverError) console.error('Linked delivery update failed:', linkedDeliverError);
-      }
-      
-      toast.success(`Order #${orderId.slice(0,8)} marked as Delivered!`, { duration: 5000 });
-      
-    } catch (error) {
-      console.error('Error in auto-delivery process:', error);
+    } else {
+      console.warn('⚠️ Order status not updated to delivered, skipping email');
     }
-  }, 180000); // 3 minutes
+
+    // Handle linked order
+    if (linkedOrderId) {
+      console.log('🔗 Updating linked order:', linkedOrderId);
+      const { error: linkedDeliverError } = await supabase
+        .from('orders')
+        .update({ status: 'delivered' })
+        .eq('id', linkedOrderId);
+      
+      if (linkedDeliverError) console.error('Linked delivery update failed:', linkedDeliverError);
+    }
+    
+    console.log('🎉 Auto-delivery process completed for order:', orderId);
+    toast.success(`Order #${orderId.slice(0,8)} marked as Delivered!`, { duration: 5000 });
+    
+  } catch (error) {
+    console.error('💥 Error in auto-delivery process:', error);
+  }
+}, 180000); // 3 minutes
 
     } catch (error) {
       console.error('Shipping error:', error);
