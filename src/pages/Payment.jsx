@@ -80,7 +80,7 @@ const processOrder = async (status = 'pending') => {
     // Critical: If order creation fails but stock was deducted, strictly speaking we should revert stock.
     // However, in a simple implementation, this is rare. 
     console.error('ORDER CREATION ERROR:', orderError);
-    throw new Error(`Failed to create order: ${orderError.message}`);
+throw new Error(`Failed to create order: ${orderError.message}`);
   }
 
   // --- STEP 3: CREATE ORDER ITEMS ---
@@ -98,7 +98,7 @@ const processOrder = async (status = 'pending') => {
 
   if (itemsError) {
     console.error('ORDER ITEMS ERROR:', itemsError);
-    throw new Error(`Failed to create order items: ${itemsError.message}`);
+throw new Error(`Failed to create order items: ${itemsError.message}`);
   }
 
   // --- STEP 4: CLEANUP ---
@@ -112,7 +112,7 @@ const processOrder = async (status = 'pending') => {
   await supabase.from('notifications').insert([{
     user_id: user.id,
     title: 'Order Placed Successfully! 🎉',
-    message: `Order #${order.id.slice(0, 8)} has been confirmed.`,
+message: `Order #${order.id.slice(0, 8)} has been confirmed.`,
     type: 'order',
     read: false
   }]);
@@ -133,11 +133,26 @@ const processOrder = async (status = 'pending') => {
 };
   // Handle Razorpay payment
 const handleRazorpayPayment = async () => {
-    console.log('🔍 DEBUG: handleRazorpayPayment called');
-  console.log('🔍 DEBUG: paymentMethod is:', paymentMethod);
-  console.log('🔍 DEBUG: Vercel check would be:', window.location.hostname.includes('vercel.app'));
-  console.log('🔍 DEBUG: Razorpay key exists:', !!import.meta.env.VITE_RAZORPAY_ID);
-
+  // 🎯 CHECK IF ON VERCEL - USE SIMULATION
+  if (window.location.hostname.includes('vercel.app')) {
+    const toastId = toast.loading('Placing your order...');
+    
+    try {
+      // Simulate payment processing (2 seconds)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 🚨 THIS IS THE KEY PART - ORDER STILL GETS PLACED!
+      await processOrder('pending');
+      
+      toast.success('Order placed successfully! (Demo Mode)', { id: toastId });
+      navigate('/orders');
+    } catch (error) {
+      console.error('ORDER PROCESSING FAILED:', error);
+toast.error(`Order failed: ${error.message}`, { id: toastId });
+      setLoading(false);
+    }
+    return;
+  }
 
   // 🎯 LOCALHOST - USE REAL RAZORPAY
   const res = await loadRazorpay();
@@ -148,9 +163,7 @@ const handleRazorpayPayment = async () => {
   }
 
   const options = {
-   // key: import.meta.env.VITE_RAZORPAY_ID,
-     key: "rzp_test_1DP5mmOLF5G5ag", // ← HARDCODE THIS!
-
+    key: import.meta.env.VITE_RAZORPAY_KEY_ID,
     amount: Math.round(orderSummary.total * 100),
     currency: 'INR',
     name: 'Fwaeh Mart',
@@ -165,7 +178,7 @@ const handleRazorpayPayment = async () => {
         navigate('/orders');
       } catch (error) {
         console.error('ORDER PROCESSING FAILED:', error);
-        toast.error(`Order failed: ${error.message}`, { id: toastId });
+toast.error(`Order failed: ${error.message}`, { id: toastId });
         setLoading(false);
       }
     },
@@ -260,7 +273,7 @@ const handlePayment = async () => {
               <div className="flex justify-between">
                 <span style={{ color: '#dc2626' }}>Shipping:</span>
                 <span className="font-semibold" style={{ color: '#b91c1c' }}>
-                  {orderSummary.shipping === 0 ? 'FREE' : `₹${orderSummary.shipping.toFixed(2)}`}
+{orderSummary.shipping === 0 ? 'FREE' : `₹${orderSummary.shipping.toFixed(2)}`}
                 </span>
               </div>
               <div className="flex justify-between">

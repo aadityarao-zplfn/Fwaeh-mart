@@ -17,9 +17,9 @@ export const initiatePayment = async (orderDetails, userInfo, onSuccess, onFailu
   }
 
   const options = {
-      key: "rzp_test_1DP5mmOLF5G5ag", // Hardcode for testing
+     // key: "rzp_test_1DP5mmOLF5G5ag", // Hardcode for testing
 
-   // key: import.meta.env.VITE_RAZORPAY_ID,
+    key: import.meta.env.VITE_RAZORPAY_KEY_ID,
     amount: Math.round(orderDetails.total * 100), // Convert to paise
     currency: 'INR',
     name: 'Fwaeh Mart',
@@ -45,6 +45,6 @@ export const initiatePayment = async (orderDetails, userInfo, onSuccess, onFailu
 
   const razorpay = new window.Razorpay(options);
   razorpay.open();
-  console.log('Razorpay Key:', import.meta.env.VITE_RAZORPAY_ID); // Add this line
+  console.log('Razorpay Key:', import.meta.env.VITE_RAZORPAY_KEY_ID); // Add this line
 
 };
