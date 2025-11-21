@@ -3,6 +3,10 @@ import toast from 'react-hot-toast';
 
 export const sendDeliveryEmail = async (order, orderItems = []) => {
   try {
+    console.log('📧 Starting email service...');
+    console.log('📨 To:', order.contact_email);
+    console.log('🆔 Order ID:', order.id);
+
     // Prepare simple item list for email
     const itemsPayload = orderItems.map(item => ({
       name: item.products?.name || 'Product',
@@ -12,13 +16,13 @@ export const sendDeliveryEmail = async (order, orderItems = []) => {
 
     const payload = {
       orderId: order.id,
-      customerEmail: order.contact_email, // Fetched from orders table
+      customerEmail: order.contact_email,
       customerName: order.contact_name || 'Valued Customer',
       totalAmount: order.total_amount,
       items: itemsPayload
     };
 
-    console.log('📧 Triggering delivery email:', payload);
+    console.log('📦 Email payload:', payload);
 
     const response = await fetch('/api/send-delivery-email', {
       method: 'POST',
@@ -28,12 +32,19 @@ export const sendDeliveryEmail = async (order, orderItems = []) => {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) throw new Error('Failed to send email');
+    console.log('📡 API Response status:', response.status);
     
+    const result = await response.json();
+    console.log('📡 API Response data:', result);
+
+    if (!response.ok) {
+      throw new Error(result.error || `HTTP ${response.status}`);
+    }
+    
+    console.log('✅ Email sent successfully');
     return { success: true };
   } catch (error) {
-    console.error('Email service error:', error);
-    // Don't block UI flow if email fails, just log it
+    console.error('❌ Email service error:', error);
     return { success: false, error: error.message };
   }
 };
