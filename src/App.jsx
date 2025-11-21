@@ -21,8 +21,8 @@ import PaymentHistory from './pages/PaymentHistory';
 import Profile from './pages/Profile';
 import DashboardSettings from './pages/DashboardSettings';
 import Shops from './pages/Shops';
-import PaymentsPending from './pages/PaymentsPending';
-import ShippingStatus from './pages/ShippingStatus';
+import PaymentsPending from './pages/paymentsPending';
+import ShippingStatus from './pages/shippingStatus';
 import CustomerDashboard from './components/CustomerDashboard';
 import CustomerOrderHistory from './components/dashboards/CustomerOrderHistory'; // ✅ NEW IMPORT
 
