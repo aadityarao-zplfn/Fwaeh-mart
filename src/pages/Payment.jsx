@@ -148,7 +148,9 @@ const handleRazorpayPayment = async () => {
   }
 
   const options = {
-    key: import.meta.env.VITE_RAZORPAY_ID,
+   // key: import.meta.env.VITE_RAZORPAY_ID,
+     key: "rzp_test_1DP5mmOLF5G5ag", // ← HARDCODE THIS!
+
     amount: Math.round(orderSummary.total * 100),
     currency: 'INR',
     name: 'Fwaeh Mart',

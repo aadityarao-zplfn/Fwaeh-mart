@@ -19,7 +19,7 @@ export const initiatePayment = async (orderDetails, userInfo, onSuccess, onFailu
   const options = {
       key: "rzp_test_1DP5mmOLF5G5ag", // Hardcode for testing
 
-    key: import.meta.env.VITE_RAZORPAY_ID,
+   // key: import.meta.env.VITE_RAZORPAY_ID,
     amount: Math.round(orderDetails.total * 100), // Convert to paise
     currency: 'INR',
     name: 'Fwaeh Mart',
