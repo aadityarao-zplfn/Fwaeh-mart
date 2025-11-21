@@ -136,7 +136,7 @@ const handleRazorpayPayment = async () => {
     console.log('🔍 DEBUG: handleRazorpayPayment called');
   console.log('🔍 DEBUG: paymentMethod is:', paymentMethod);
   console.log('🔍 DEBUG: Vercel check would be:', window.location.hostname.includes('vercel.app'));
-  console.log('🔍 DEBUG: Razorpay key exists:', !!import.meta.env.VITE_RAZORPAY_KEY_ID);
+  console.log('🔍 DEBUG: Razorpay key exists:', !!import.meta.env.VITE_RAZORPAY_ID);
 
 
   // 🎯 LOCALHOST - USE REAL RAZORPAY
@@ -148,7 +148,7 @@ const handleRazorpayPayment = async () => {
   }
 
   const options = {
-    key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+    key: import.meta.env.VITE_RAZORPAY_ID,
     amount: Math.round(orderSummary.total * 100),
     currency: 'INR',
     name: 'Fwaeh Mart',
