@@ -214,7 +214,8 @@ const { error } = await supabase.from('products').insert([
         {filteredProducts.map(product => {
             const alreadyOwned = existingImports.get(product.id);
             const currentConfig = importConfig[product.id] || {};
-
+            const ownedQuantity = alreadyOwned ? alreadyOwned.stock_quantity : 0;
+            const maxImportable = Math.max(0, product.stock_quantity - ownedQuantity);
             return (
             <div key={product.id} className="border border-red-100 rounded-2xl p-4 bg-white hover:shadow-xl transition-all duration-300 flex flex-col h-full relative overflow-hidden">
                 
@@ -271,8 +272,8 @@ const { error } = await supabase.from('products').insert([
                                 <Package size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
                                 <input 
                                     type="number" 
-                                    placeholder={`Max ${product.stock_quantity}`}
-                                    max={product.stock_quantity}
+                                    placeholder={`Max ${maxImportable}`}
+                                    max={maxImportable}
                                     className="w-full pl-7 pr-2 py-2 border border-gray-300 rounded-lg text-sm focus:border-red-400 outline-none"
                                     value={currentConfig.qty || ''}
                                     onChange={(e) => handleConfigChange(product.id, 'qty', e.target.value)}

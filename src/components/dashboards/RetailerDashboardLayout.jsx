@@ -9,7 +9,8 @@ const RetailerDashboardLayout = ({ children }) => {
 const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { path: '/dashboard/payments', label: 'Payments pending', icon: CreditCard },
-  { path: '/dashboard/orders', label: 'Customer Orders', icon: ShoppingBag },
+  
+  { path: '/dashboard/customer-orders', label: 'Customer Orders', icon: ShoppingBag },
   { path: '/dashboard/shipping', label: 'Shipping Status', icon: TruckIcon },
   { path: '/dashboard/queries', label: 'Queries', icon: HelpCircle },
   { path: '/dashboard/settings', label: 'Shop Settings', icon: Settings },

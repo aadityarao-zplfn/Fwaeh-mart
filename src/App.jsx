@@ -30,6 +30,7 @@ import SchedulePickup from './pages/SchedulePickup';
 import PickupSuccess from './pages/PickupSuccess';
 import QueriesPage from './pages/QueriesPage';
 import { CartProvider } from './contexts/CartContext';
+import CustomerOrders from './pages/CustomerOrders';
 
 function App() {
   return (
@@ -214,6 +215,18 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            
+            {/*Retailer Customer Orders */}
+            <Route 
+              path="/dashboard/customer-orders" 
+              element={
+                <ProtectedRoute allowedRoles={['retailer']}>
+                  <RetailerDashboardLayout>
+                    <CustomerOrders />
+                  </RetailerDashboardLayout>
+                </ProtectedRoute>
+              } 
+            />
 
             {/* Retailer Shipping */}
             <Route 
@@ -250,17 +263,17 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            // Wholesaler Queries Route
-<Route 
-  path="/wholesaler/queries" 
-  element={
-    <ProtectedRoute allowedRoles={['wholesaler']}>
-      <WholesalerDashboardLayout>
-        <QueriesPage />
-      </WholesalerDashboardLayout>
-    </ProtectedRoute>
-  } 
-/>
+           {/*Wholesaler Queries Route*/}
+            <Route 
+              path="/wholesaler/queries" 
+              element={
+                <ProtectedRoute allowedRoles={['wholesaler']}>
+                  <WholesalerDashboardLayout>
+                    <QueriesPage />
+                  </WholesalerDashboardLayout>
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/pickup-success" 
               element={
