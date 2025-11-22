@@ -39,7 +39,7 @@ const Cart = () => {
           }
         )
         .subscribe();
-
+  
       return () => subscription.unsubscribe();
     } else {
       setLoading(false);
@@ -60,6 +60,8 @@ const Cart = () => {
             price,
             image_url,
             stock_quantity,
+            category, 
+            seller_id, 
             seller:profiles!seller_id(full_name)
           )
         `)
@@ -77,23 +79,114 @@ const Cart = () => {
 
   const fetchRecommendedProducts = async () => {
     try {
-      // Get product IDs from cart, handle empty case
-      const productIds = cartItems.length > 0 
-        ? cartItems.map(item => item.product_id) 
-        : ['00000000-0000-0000-0000-000000000000']; // dummy UUID
-      
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .not('id', 'in', `(${productIds.join(',')})`)
-        .limit(4)
-        .order('created_at', { ascending: false });
+      // ✅ Get FRESH cart items directly from database instead of relying on state
+      const { data: freshCartData, error: cartError } = await supabase
+        .from('cart_items')
+        .select('product_id')
+        .eq('user_id', user.id);
   
-      if (error) throw error;
-      setRecommendedProducts(data || []);
+      if (cartError) throw cartError;
+  
+      const currentCartIds = freshCartData?.map(item => item.product_id) || [];
+      const excludeIds = currentCartIds.length > 0 ? currentCartIds : ['00000000-0000-0000-0000-000000000000'];
+  
+      // ✅ Rest of your existing algorithm remains the same
+      const { data: historyData, error: historyError } = await supabase
+        .from('order_items')
+        .select(`
+          products:products!order_items_product_id_fkey (
+            category,
+            seller_id
+          ),
+          orders!inner (
+            user_id
+          )
+        `)
+        .eq('orders.user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+  
+      if (historyError) throw historyError;
+  
+      const categories = new Set();
+      const sellers = new Set();
+  
+      const extractInfo = (productData) => {
+        if (productData?.category) categories.add(productData.category);
+        if (productData?.seller_id) sellers.add(productData.seller_id);
+      };
+  
+      historyData?.forEach(item => {
+        if (item.products) extractInfo(item.products);
+      });
+  
+      // ✅ Use FRESH cart data for personalization too
+      if (freshCartData) {
+        // We need to fetch the actual product details for cart items
+        const { data: cartProducts, error: cartProductsError } = await supabase
+          .from('products')
+          .select('category, seller_id')
+          .in('id', currentCartIds);
+  
+        if (!cartProductsError && cartProducts) {
+          cartProducts.forEach(product => extractInfo(product));
+        }
+      }
+  
+      let recommendations = [];
+      const categoryList = Array.from(categories);
+      const sellerList = Array.from(sellers);
+  
+      if (categoryList.length > 0 || sellerList.length > 0) {
+        let query = supabase
+          .from('products')
+          .select('*')
+          .eq('is_active', true)
+          .gt('stock_quantity', 0)
+          .not('id', 'in', `(${excludeIds.join(',')})`);
+  
+        const orConditions = [];
+        if (categoryList.length > 0) {
+          const fmtCategories = categoryList.map(c => `"${c}"`).join(',');
+          orConditions.push(`category.in.(${fmtCategories})`);
+        }
+        if (sellerList.length > 0) {
+          orConditions.push(`seller_id.in.(${sellerList.join(',')})`);
+        }
+        
+        if (orConditions.length > 0) {
+          query = query.or(orConditions.join(','));
+        }
+  
+        const { data: personalized, error: personalError } = await query.limit(4);
+        if (!personalError && personalized) {
+          recommendations = personalized;
+        }
+      }
+  
+      // Fallback: Fill with newest products
+      if (recommendations.length < 4) {
+        const foundIds = recommendations.map(p => p.id);
+        const allExcludedIds = [...excludeIds, ...foundIds];
+  
+        const { data: generic, error: genericError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('is_active', true)
+          .gt('stock_quantity', 0)
+          .not('id', 'in', `(${allExcludedIds.join(',')})`)
+          .order('created_at', { ascending: false })
+          .limit(4 - recommendations.length);
+  
+        if (!genericError && generic) {
+          recommendations = [...recommendations, ...generic];
+        }
+      }
+  
+      setRecommendedProducts(recommendations);
+  
     } catch (error) {
       console.error('Error fetching recommended products:', error);
-      // Fallback to empty array
       setRecommendedProducts([]);
     }
   };
@@ -226,6 +319,11 @@ const updateQuantity = async (itemId, newQuantity, maxStock) => {
   };
 
   const addToCart = async (product) => {
+    if (product.stock_quantity <= 0) {
+      toast.error('This item is currently out of stock');
+      return;
+    }
+  
     try {
       const { error } = await supabase
         .from('cart_items')
@@ -236,11 +334,37 @@ const updateQuantity = async (itemId, newQuantity, maxStock) => {
             quantity: 1
           }
         ]);
-
+  
       if (error) throw error;
+      
       updateCartCount(1);
       toast.success('Product added to cart');
-      fetchCartItems();
+      
+      // ✅ Get FRESH cart data and pass it directly to recommendations
+      const { data: freshCartData } = await supabase
+        .from('cart_items')
+        .select(`
+          id,
+          quantity,
+          products:product_id(
+            id,
+            name,
+            price,
+            image_url,
+            stock_quantity,
+            category, 
+            seller_id
+            seller:profiles!seller_id(full_name)
+          )
+        `)
+        .eq('user_id', user.id);
+      
+      // ✅ Update local state
+      setCartItems(freshCartData || []);
+      
+      // ✅ Pass fresh data directly to recommendations
+      fetchRecommendedProducts(freshCartData || []);
+      
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Failed to add product to cart');
