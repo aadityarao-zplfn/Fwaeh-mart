@@ -62,7 +62,7 @@ const Cart = () => {
             stock_quantity,
             category, 
             seller_id, 
-            seller:profiles!seller_id(full_name)
+            seller:profiles!seller_id(full_name, location_lat, location_lng)
           )
         `)
         .eq('user_id', user.id);
@@ -370,7 +370,30 @@ const updateQuantity = async (itemId, newQuantity, maxStock) => {
       toast.error('Failed to add product to cart');
     }
   };
+  const handleOfflinePickup = () => {
+    if (cartItems.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
 
+    // Check 1: Ensure all items are from the same seller
+    const uniqueSellers = new Set(cartItems.map(item => item.products.seller_id));
+    if (uniqueSellers.size > 1) {
+      toast.error('Cannot schedule pickup from two shops simultaneously, please add separately.');
+      return;
+    }
+
+    // Check 2: Ensure the seller has a shop location set up
+    const seller = cartItems[0]?.products?.seller;
+    
+    if (!seller || !seller.location_lat || !seller.location_lng) {
+      toast.error('Seller does not have an offline shop.');
+      return;
+    }
+
+    // Validations passed
+    navigate('/schedule-pickup');
+  };
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(to bottom, #f3d7d7, #f9e5e5)' }}>
@@ -515,14 +538,7 @@ const updateQuantity = async (itemId, newQuantity, maxStock) => {
                       </button>
                     </div>
 
-                    {/* Save for Later */}
-                    <button
-                      className="flex items-center gap-2 text-sm font-medium transition-all hover:opacity-80"
-                      style={{ color: '#e57373' }}
-                    >
-                      <Heart size={16} />
-                      Save for Later
-                    </button>
+                    
                   </div>
 
                   {/* Price and Actions */}
@@ -621,7 +637,7 @@ const updateQuantity = async (itemId, newQuantity, maxStock) => {
 
   {/* 🆕 NEW OFFLINE BUTTON */}
   <button
-    onClick={() => navigate('/schedule-pickup')}
+    onClick={handleOfflinePickup}
     className="w-full py-3 rounded-xl font-bold transition-all hover:opacity-80 text-sm flex items-center justify-center gap-2 border-2"
     style={{ 
       background: '#fff', 
