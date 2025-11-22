@@ -33,200 +33,197 @@ const Payment = () => {
     });
   };
 
-  // In src/pages/Payment.jsx
-
-const processOrder = async (status = 'pending') => {
-  console.log('Processing order...');
-  
-  // --- STEP 1: ATOMIC STOCK UPDATE (KEEP THIS) ---
-  const inventoryPayload = cartItems.map(item => ({
-    product_id: item.product_id,
-    quantity: item.quantity
-  }));
-
-  const { data: stockResult, error: rpcError } = await supabase.rpc('process_order_inventory', {
-    cart_items: inventoryPayload
-  });
-
-  if (rpcError || !stockResult?.success) {
-    console.error('Inventory Error:', rpcError || stockResult?.error);
-    throw new Error(stockResult?.error || 'Some items are out of stock or unavailable.');
-  }
-
-  console.log('✅ Stock synchronized successfully. Creating order records...');
-
-  // --- STEP 2: CREATE ORDER RECORD (KEEP THIS) ---
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert([
-      {
-        user_id: orderData.user_id,
-        total_amount: orderData.total_amount,
-        shipping_address: orderData.shipping_address,
-        payment_method: orderData.payment_method,
-        contact_phone: orderData.contact_phone,
-        contact_email: orderData.contact_email,
-        status: status
-      }
-    ])
-    .select()
-    .single();
-
-  if (orderError) {
-    throw new Error(`Failed to create order: ${orderError.message}`);
-  }
-
-  // --- STEP 3: CREATE ORDER ITEMS (KEEP THIS) ---
-  const orderItemsWithId = orderItemsData.map(item => ({
-    order_id: order.id,
-    product_id: item.product_id,
-    seller_id: item.seller_id,
-    quantity: item.quantity,
-    price_at_purchase: item.price_at_purchase,
-    wholesaler_price: item.wholesaler_price,
-  }));
-
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItemsWithId);
-
-  if (itemsError) {
-    throw new Error(`Failed to create order items: ${itemsError.message}`);
-  }
-
-  // --- STEP 4: CLEANUP (KEEP THIS) ---
-  // Clear Cart
-  await supabase
-    .from('cart_items')
-    .delete()
-    .eq('user_id', user.id);
-
-  // 🔥 REPLACE JUST THE NOTIFICATION PART WITH THIS:
-  // Fetch product names for notification
-  const productIds = cartItems.map(item => item.product_id);
-  const { data: products } = await supabase
-    .from('products')
-    .select('id, name')
-    .in('id', productIds);
-
-  const productMap = new Map(products?.map(p => [p.id, p.name]) || []);
-  const productNames = cartItems.map(item => productMap.get(item.product_id) || 'Product').join(', ');
-
-  // Notification with product names
-  await supabase.from('notifications').insert([{
-    user_id: user.id,
-    title: 'Order Placed Successfully! 🎉',
-    message: `Order #${order.id.slice(0, 8)} - ${productNames} has been confirmed.`,
-    type: 'order',
-    read: false
-  }]);
-
-  // Save Address if checked (KEEP THIS)
-  if (saveAddress) {
-    await supabase
-      .from('profiles')
-      .update({
-        address: fullAddress,
-        phone: shippingInfo.phone,
-        full_name: shippingInfo.fullName
-      })
-      .eq('id', user.id);
-  }
-
-  return order;
-};
-  // Handle Razorpay payment
-const handleRazorpayPayment = async () => {
-  // 🎯 CHECK IF ON VERCEL - USE SIMULATION
-  /*if (window.location.hostname.includes('vercel.app')) {
-    const toastId = toast.loading('Placing your order...');
+  // ✅ NEW: Split Order Logic
+  // This function now creates ONE order per CART ITEM
+  const processOrder = async (status = 'pending', paymentId = null) => {
+    console.log('Processing split orders...');
     
-    try {
-      // Simulate payment processing (2 seconds)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // 🚨 THIS IS THE KEY PART - ORDER STILL GETS PLACED!
-      await processOrder('pending');
-      
-      toast.success('Order placed successfully! (Demo Mode)', { id: toastId });
-      navigate('/orders');
-    } catch (error) {
-      console.error('ORDER PROCESSING FAILED:', error);
-toast.error(`Order failed: ${error.message}`, { id: toastId });
-      setLoading(false);
+    // --- STEP 1: ATOMIC STOCK UPDATE (Keep Batch) ---
+    // We deduct ALL stock at once. If any item fails, the whole checkout stops.
+    const inventoryPayload = cartItems.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity
+    }));
+
+    const { data: stockResult, error: rpcError } = await supabase.rpc('process_order_inventory', {
+      cart_items: inventoryPayload
+    });
+
+    if (rpcError || !stockResult?.success) {
+      console.error('Inventory Error:', rpcError || stockResult?.error);
+      throw new Error(stockResult?.error || 'Some items are out of stock or unavailable.');
     }
-    return;
-  }*/
 
-  // 🎯 LOCALHOST - USE REAL RAZORPAY
-  const res = await loadRazorpay();
+    console.log('✅ Stock synchronized. Creating separate orders for each item...');
 
-  if (!res) {
-    toast.error('Razorpay SDK failed to load');
-    return;
-  }
+    // --- STEP 2: CREATE SEPARATE ORDERS ---
+    const createdOrders = [];
 
-  const options = {
-    key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-    amount: Math.round(orderSummary.total * 100),
-    currency: 'INR',
-    name: 'Fwaeh Mart',
-    description: 'Order Payment',
-    handler: async function (response) {
-      console.log('RAZORPAY SUCCESS:', response);
-      const toastId = toast.loading('Processing your order...');
-      
+    // We loop through each item and create a distinct order chain for it
+    for (const item of orderItemsData) {
+        // 1. Calculate specific amount for THIS item (Item Price * Qty)
+        // Note: Shipping/Tax is simplified here to be per-item based on the cart logic
+        const itemTotal = (parseFloat(item.price_at_purchase) * item.quantity);
+
+        // 2. Create the Order Header
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert([
+            {
+                user_id: orderData.user_id,
+                total_amount: itemTotal, // Individual total
+                status: status,
+                shipping_address: orderData.shipping_address,
+                payment_method: orderData.payment_method,
+                contact_phone: orderData.contact_phone,
+                contact_email: orderData.contact_email,
+                // Link all sub-orders via the same Payment ID
+                payment_id: paymentId 
+            }
+            ])
+            .select()
+            .single();
+
+        if (orderError) {
+            console.error("Order creation failed for item:", item);
+            // In a real production app, you might need a rollback strategy here
+            throw new Error(`Failed to create order for an item: ${orderError.message}`);
+        }
+
+        // 3. Create the Order Item (One-to-One relationship now)
+        const { error: itemError } = await supabase
+            .from('order_items')
+            .insert({
+                order_id: order.id, // Link to the new specific order
+                product_id: item.product_id,
+                seller_id: item.seller_id,
+                quantity: item.quantity,
+                price_at_purchase: item.price_at_purchase,
+                wholesaler_price: item.wholesaler_price
+            });
+
+        if (itemError) {
+            throw new Error(`Failed to attach item to order: ${itemError.message}`);
+        }
+
+        createdOrders.push(order);
+    }
+
+    // --- STEP 3: CLEANUP ---
+    // Clear Cart
+    await supabase
+        .from('cart_items')
+        .delete()
+        .eq('user_id', user.id);
+
+    // --- STEP 4: NOTIFICATION ---
+    // We send one aggregated notification for the user
+    const productIds = cartItems.map(item => item.product_id);
+    const { data: products } = await supabase
+        .from('products')
+        .select('id, name')
+        .in('id', productIds);
+
+    const productMap = new Map(products?.map(p => [p.id, p.name]) || []);
+    const productNames = cartItems.map(item => productMap.get(item.product_id) || 'Product').join(', ');
+
+    await supabase.from('notifications').insert([{
+        user_id: user.id,
+        title: 'Orders Placed Successfully! 🎉',
+        message: `We have created ${createdOrders.length} separate orders for: ${productNames}. You can track them individually.`,
+        type: 'order',
+        read: false
+    }]);
+
+    // Save Address if checked
+    if (saveAddress) {
+        await supabase
+        .from('profiles')
+        .update({
+            address: fullAddress,
+            phone: shippingInfo.phone,
+            full_name: shippingInfo.fullName
+        })
+        .eq('id', user.id);
+    }
+
+    return createdOrders; // Return array of orders
+  };
+
+  // Handle Razorpay payment
+  const handleRazorpayPayment = async () => {
+    const res = await loadRazorpay();
+
+    if (!res) {
+      toast.error('Razorpay SDK failed to load');
+      return;
+    }
+
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: Math.round(orderSummary.total * 100),
+      currency: 'INR',
+      name: 'Fwaeh Mart',
+      description: 'Order Payment',
+      handler: async function (response) {
+        console.log('RAZORPAY SUCCESS:', response);
+        const toastId = toast.loading('Processing your orders...');
+        
+        try {
+          // Pass the Razorpay Payment ID to link orders
+          await processOrder('pending', response.razorpay_payment_id);
+          toast.success('Payment successful! Orders placed.', { id: toastId });
+          navigate('/orders');
+        } catch (error) {
+          console.error('ORDER PROCESSING FAILED:', error);
+          toast.error(`Order failed: ${error.message}`, { id: toastId });
+          setLoading(false);
+        }
+      },
+      prefill: {
+        name: shippingInfo.fullName,
+        email: shippingInfo.email,
+        contact: shippingInfo.phone
+      },
+      theme: {
+        color: '#ff5757'
+      },
+      modal: {
+        ondismiss: function() {
+          toast.error('Payment cancelled');
+          setLoading(false);
+        }
+      }
+    };
+
+    const razorpay = new window.Razorpay(options);
+    razorpay.open();
+  };
+
+  // Main payment handler
+  const handlePayment = async () => {
+    setLoading(true);
+
+    if (paymentMethod === 'online') {
+      await handleRazorpayPayment();
+    } else {
+      // Cash on Delivery
+      const toastId = toast.loading('Placing your orders...');
       try {
-        await processOrder('pending');
-        toast.success('Payment successful! Order placed.', { id: toastId });
+        // Generate a local ID for COD grouping if needed, or leave null
+        const codId = `COD-${Date.now()}`;
+        await processOrder('pending', codId);
+        toast.success('Orders placed successfully!', { id: toastId });
         navigate('/orders');
       } catch (error) {
-        console.error('ORDER PROCESSING FAILED:', error);
-toast.error(`Order failed: ${error.message}`, { id: toastId });
-        setLoading(false);
-      }
-    },
-    prefill: {
-      name: shippingInfo.fullName,
-      email: shippingInfo.email,
-      contact: shippingInfo.phone
-    },
-    theme: {
-      color: '#ff5757'
-    },
-    modal: {
-      ondismiss: function() {
-        toast.error('Payment cancelled');
+        console.error('COD ORDER FAILED:', error);
+        toast.error('Failed to place order: ' + error.message, { id: toastId });
+      } finally {
         setLoading(false);
       }
     }
   };
 
-  const razorpay = new window.Razorpay(options);
-  razorpay.open();
-};
-// Main payment handler
-const handlePayment = async () => {
-  setLoading(true);
-
-  if (paymentMethod === 'online') {
-    // Online payment with Razorpay
-    await handleRazorpayPayment();
-  } else {
-    // Cash on Delivery
-    const toastId = toast.loading('Placing your order...');
-    try {
-      await processOrder('pending');
-      toast.success('Order placed successfully!', { id: toastId });
-      navigate('/orders');
-    } catch (error) {
-      console.error('COD ORDER FAILED:', error);
-      toast.error('Failed to place order: ' + error.message, { id: toastId });
-    } finally {
-      setLoading(false);
-    }
-  }
-};
   if (!orderData || !orderSummary) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -277,7 +274,7 @@ const handlePayment = async () => {
               <div className="flex justify-between">
                 <span style={{ color: '#dc2626' }}>Shipping:</span>
                 <span className="font-semibold" style={{ color: '#b91c1c' }}>
-{orderSummary.shipping === 0 ? 'FREE' : `₹${orderSummary.shipping.toFixed(2)}`}
+                  {orderSummary.shipping === 0 ? 'FREE' : `₹${orderSummary.shipping.toFixed(2)}`}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -370,7 +367,7 @@ const handlePayment = async () => {
               className="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
             >
-              {loading ? 'Processing...' : paymentMethod === 'online' ? 'Pay Now' : 'Confirm Order'}
+              {loading ? 'Processing...' : paymentMethod === 'online' ? 'Pay Now' : 'Confirm Orders'}
             </button>
 
             <button
