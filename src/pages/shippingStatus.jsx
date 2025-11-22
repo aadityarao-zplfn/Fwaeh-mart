@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { Truck, Box, MapPin, Clock, ArrowUpRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-//import { sendDeliveryEmail } from '../utils/emailService';
 
 const ShippingStatus = () => {
   const [orders, setOrders] = useState([]);
@@ -15,7 +14,6 @@ const ShippingStatus = () => {
     if (user && profile) {
       fetchOrdersToShip();
       
-      // Real-time subscription ONLY - no polling
       const subscription = supabase
         .channel('orders-changes')
         .on(
@@ -106,16 +104,13 @@ const ShippingStatus = () => {
       setLoading(false);
     }
   };
-    // src/pages/shippingStatus.jsx
 
-const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
+  const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
     const toastId = toast.loading('Dispatching order...');
   
     try {
       const timestamp = new Date().toISOString();
       
-      // 1. Update status to 'in_transit' and set the timestamp
-      // Your Database Cron Job will see this timestamp and mark it 'delivered' after 3 mins
       const { error: updateError } = await supabase
         .from('orders')
         .update({ 
@@ -126,7 +121,6 @@ const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
   
       if (updateError) throw updateError;
   
-      // 2. Handle linked order (if any)
       if (linkedOrderId) {
         const { error: linkedError } = await supabase
           .from('orders')
@@ -139,14 +133,8 @@ const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
         if (linkedError) throw linkedError;
       }
   
-      // 3. Success Message
       toast.success('Order dispatched! It will auto-complete in 3 minutes.', { id: toastId });
-      
-      // 4. Update UI instantly
       setOrders(prev => prev.filter(o => o.id !== orderId));
-  
-      // ❌ THE TIMEOUT BLOCK IS COMPLETELY REMOVED
-      // The "3 minute logic" is now safely running inside your database.
   
     } catch (error) {
       console.error('Shipping error:', error);
@@ -184,8 +172,9 @@ const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
             <div key={order.id} className="bg-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all border border-blue-50">
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded font-mono">#{order.id.slice(0, 8)}</span>
+                  {/* Updated Order ID and Status Section */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-sm text-gray-500 font-mono">#{order.id.slice(0, 8)}</span>
                     <span className="flex items-center text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded font-bold">
                       <Clock size={12} className="mr-1" /> Pending Shipment
                     </span>
@@ -195,27 +184,45 @@ const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-start gap-3">
-                    <MapPin className="text-gray-400 mt-1" size={18} />
-                    <p className="text-sm text-gray-600 font-medium w-full md:w-2/3">{order.shipping_address}</p>
+
+                  {/* Product Names */}
+                  <div className="mb-3">
+                    <p className="text-sm font-medium text-gray-700">
+                      {order.order_items?.map((item, index) => (
+                        <span key={item.id}>
+                          {item.products?.name}
+                          {index < order.order_items.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </p>
                   </div>
+
+                  {/* Shipping Address */}
+                  <div className="flex items-start gap-3">
+                    <MapPin className="text-gray-400 mt-0.5" size={16} />
+                    <p className="text-sm text-gray-600 font-medium">{order.shipping_address}</p>
+                  </div>
+
+                  {/* Product Images */}
                   <div className="flex items-center gap-2 mt-3">
                     {order.order_items?.map((item, i) => (
                       <img 
                         key={i} 
                         src={item.products?.image_url || '/placeholder.svg'} 
-                        className="w-10 h-10 rounded-lg border border-gray-200 object-cover" 
+                        className="w-8 h-8 rounded-lg border border-gray-200 object-cover" 
                         alt={item.products?.name} 
                       />
                     ))}
                   </div>
                 </div>
+                
+                {/* Dispatch Button */}
                 <div className="flex items-center justify-end">
                   <button
                     onClick={() => handleShipOrder(order.id, order.order_type, order.wholesaler_fulfillment_order_id)}
-                    className="px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center gap-2"
+                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center gap-2 text-sm"
                   >
-                    <Box size={20} /> Dispatch Order <ArrowUpRight size={18} />
+                    <Box size={16} /> Dispatch <ArrowUpRight size={14} />
                   </button>
                 </div>
               </div>

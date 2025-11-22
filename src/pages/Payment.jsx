@@ -38,10 +38,7 @@ const Payment = () => {
 const processOrder = async (status = 'pending') => {
   console.log('Processing order...');
   
-  // --- STEP 1: ATOMIC STOCK UPDATE (The New Logic) ---
-  // We verify and deduct stock FIRST. If this fails, we stop the order.
-  
-  // Prepare payload for RPC: [{ product_id: "...", quantity: 1 }, ...]
+  // --- STEP 1: ATOMIC STOCK UPDATE (KEEP THIS) ---
   const inventoryPayload = cartItems.map(item => ({
     product_id: item.product_id,
     quantity: item.quantity
@@ -58,7 +55,7 @@ const processOrder = async (status = 'pending') => {
 
   console.log('✅ Stock synchronized successfully. Creating order records...');
 
-  // --- STEP 2: CREATE ORDER RECORD ---
+  // --- STEP 2: CREATE ORDER RECORD (KEEP THIS) ---
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert([
@@ -69,7 +66,6 @@ const processOrder = async (status = 'pending') => {
         payment_method: orderData.payment_method,
         contact_phone: orderData.contact_phone,
         contact_email: orderData.contact_email,
-        // Remove contact_name if it's not in your DB schema, strictly sticking to your provided schema
         status: status
       }
     ])
@@ -77,13 +73,10 @@ const processOrder = async (status = 'pending') => {
     .single();
 
   if (orderError) {
-    // Critical: If order creation fails but stock was deducted, strictly speaking we should revert stock.
-    // However, in a simple implementation, this is rare. 
-    console.error('ORDER CREATION ERROR:', orderError);
-throw new Error(`Failed to create order: ${orderError.message}`);
+    throw new Error(`Failed to create order: ${orderError.message}`);
   }
 
-  // --- STEP 3: CREATE ORDER ITEMS ---
+  // --- STEP 3: CREATE ORDER ITEMS (KEEP THIS) ---
   const orderItemsWithId = orderItemsData.map(item => ({
     order_id: order.id,
     product_id: item.product_id,
@@ -98,27 +91,37 @@ throw new Error(`Failed to create order: ${orderError.message}`);
     .insert(orderItemsWithId);
 
   if (itemsError) {
-    console.error('ORDER ITEMS ERROR:', itemsError);
-throw new Error(`Failed to create order items: ${itemsError.message}`);
+    throw new Error(`Failed to create order items: ${itemsError.message}`);
   }
 
-  // --- STEP 4: CLEANUP ---
+  // --- STEP 4: CLEANUP (KEEP THIS) ---
   // Clear Cart
   await supabase
     .from('cart_items')
     .delete()
     .eq('user_id', user.id);
 
-  // Notification
+  // 🔥 REPLACE JUST THE NOTIFICATION PART WITH THIS:
+  // Fetch product names for notification
+  const productIds = cartItems.map(item => item.product_id);
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, name')
+    .in('id', productIds);
+
+  const productMap = new Map(products?.map(p => [p.id, p.name]) || []);
+  const productNames = cartItems.map(item => productMap.get(item.product_id) || 'Product').join(', ');
+
+  // Notification with product names
   await supabase.from('notifications').insert([{
     user_id: user.id,
     title: 'Order Placed Successfully! 🎉',
-message: `Order #${order.id.slice(0, 8)} has been confirmed.`,
+    message: `Order #${order.id.slice(0, 8)} - ${productNames} has been confirmed.`,
     type: 'order',
     read: false
   }]);
 
-  // Save Address if checked
+  // Save Address if checked (KEEP THIS)
   if (saveAddress) {
     await supabase
       .from('profiles')

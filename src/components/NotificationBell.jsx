@@ -81,6 +81,20 @@ const NotificationBell = () => {
     }
   };
 
+  // Extract order ID from notification message if it contains one
+  const extractOrderInfo = (notification) => {
+    // Look for order ID pattern in message (like #abc12345)
+    const orderIdMatch = notification.message?.match(/#([a-f0-9]{8})/i);
+    const orderId = orderIdMatch ? orderIdMatch[1] : null;
+    
+    return {
+      orderId,
+      // You could also extract product names here if they're included in the message
+      // For now, we'll use a simplified version
+      displayMessage: notification.message?.replace(/#[a-f0-9]{8}/i, '').trim()
+    };
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -123,36 +137,54 @@ const NotificationBell = () => {
               </div>
             ) : (
               <div className="divide-y" style={{ borderColor: '#fee2e2' }}>
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`p-4 transition-all hover:bg-red-50 ${!notification.read ? 'bg-red-50/60' : ''}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl mt-0.5">{getNotificationIcon(notification.type)}</span>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-sm mb-1 truncate" style={{ color: '#b91c1c' }}>
-                          {notification.title}
-                        </h4>
-                        <p className="text-xs mb-2 line-clamp-2" style={{ color: '#ef4444' }}>
-                          {notification.message}
-                        </p>
-                        <p className="text-[10px] font-medium opacity-70" style={{ color: '#dc2626' }}>
-                          {new Date(notification.created_at).toLocaleString()}
-                        </p>
+                {notifications.map((notification) => {
+                  const { orderId, displayMessage } = extractOrderInfo(notification);
+                  
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`p-3 transition-all hover:bg-red-50 ${!notification.read ? 'bg-red-50/60' : ''}`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg mt-0.5 flex-shrink-0">
+                          {getNotificationIcon(notification.type)}
+                        </span>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          {/* Order ID and Title in one line */}
+                          <div className="flex items-center gap-2">
+                            {orderId && (
+                              <span className="text-xs text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                                #{orderId}
+                              </span>
+                            )}
+                            <h4 className="font-bold text-sm truncate flex-1" style={{ color: '#b91c1c' }}>
+                              {notification.title}
+                            </h4>
+                          </div>
+                          
+                         {/* Message with better formatting */}
+<p className="text-xs line-clamp-3 leading-relaxed" style={{ color: '#ef4444' }}>
+  {displayMessage}
+</p>
+                          
+                          {/* Timestamp */}
+                          <p className="text-[10px] font-medium opacity-70" style={{ color: '#dc2626' }}>
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        {!notification.read && (
+                          <button
+                            onClick={() => handleMarkAsRead(notification.id)}
+                            className="p-1 rounded-full hover:bg-red-100 transition-all flex-shrink-0 mt-1"
+                            title="Mark as read"
+                          >
+                            <Check size={12} style={{ color: '#ff5757' }} />
+                          </button>
+                        )}
                       </div>
-                      {!notification.read && (
-                        <button
-                          onClick={() => handleMarkAsRead(notification.id)}
-                          className="p-1.5 rounded-full hover:bg-red-100 transition-all flex-shrink-0"
-                          title="Mark as read"
-                        >
-                          <Check size={14} style={{ color: '#ff5757' }} />
-                        </button>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

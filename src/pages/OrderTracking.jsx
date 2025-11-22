@@ -471,35 +471,42 @@ useEffect(() => {
             
             return (
               <div key={order.id} className="bg-white p-6 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-bold text-lg">Order #{order.id.slice(0,8)}</h3>
-                    {isOffline && (
-                      <span className="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded font-bold flex items-center">
-                        <Store size={12} className="mr-1"/> Pickup
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-500 text-sm">{new Date(order.created_at).toLocaleDateString()}</p>
-                  
-                  <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold capitalize 
-                    ${order.status === 'delivered' ? 'bg-green-100 text-green-700' : 
-                      order.status === 'pending' && isOffline ? 'bg-orange-100 text-orange-700' : 
-                      order.status === 'in_transit' ? 'bg-blue-100 text-blue-700' : 
-                      'bg-yellow-100 text-yellow-700'}`}>
-                    {isOffline && order.status === 'pending' ? 'Waiting for Pickup' : 
-                      order.status === 'in_transit' ? 'In Transit' : order.status}
-                  </span>
+               <div>
+  <div className="flex items-center gap-3 mb-1">
+    <h3 className="font-bold text-lg">
+      {order.order_items?.length === 1 
+        ? order.order_items[0]?.products?.name || 'Order'
+        : `${order.order_items?.length} Items`
+      }
+    </h3>
+    {isOffline && (
+      <span className="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded font-bold flex items-center">
+        <Store size={12} className="mr-1"/> Pickup
+      </span>
+    )}
+  </div>
+  <p className="text-gray-500 text-sm mb-1">
+    Order #{order.id.slice(0,8)} • {new Date(order.created_at).toLocaleDateString()}
+  </p>
+  
+  <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold capitalize 
+    ${order.status === 'delivered' ? 'bg-green-100 text-green-700' : 
+      order.status === 'pending' && isOffline ? 'bg-orange-100 text-orange-700' : 
+      order.status === 'in_transit' ? 'bg-blue-100 text-blue-700' : 
+      'bg-yellow-100 text-yellow-700'}`}>
+    {isOffline && order.status === 'pending' ? 'Waiting for Pickup' : 
+      order.status === 'in_transit' ? 'In Transit' : order.status}
+  </span>
 
-                  {isOffline && order.scheduled_at && order.status === 'pending' && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Pickup: {new Date(order.scheduled_at).toLocaleString([], { 
-                        dateStyle: 'short', 
-                        timeStyle: 'short' 
-                      })}
-                    </p>
-                  )}
-                </div>
+  {isOffline && order.scheduled_at && order.status === 'pending' && (
+    <p className="text-xs text-gray-500 mt-1">
+      Pickup: {new Date(order.scheduled_at).toLocaleString([], { 
+        dateStyle: 'short', 
+        timeStyle: 'short' 
+      })}
+    </p>
+  )}
+</div>
 
                 <div className="flex items-center gap-3">
                   {isOffline && order.status === 'pending' && (
