@@ -135,7 +135,7 @@ message: `Order #${order.id.slice(0, 8)} has been confirmed.`,
   // Handle Razorpay payment
 const handleRazorpayPayment = async () => {
   // 🎯 CHECK IF ON VERCEL - USE SIMULATION
-  if (window.location.hostname.includes('vercel.app')) {
+  /*if (window.location.hostname.includes('vercel.app')) {
     const toastId = toast.loading('Placing your order...');
     
     try {
@@ -153,7 +153,7 @@ toast.error(`Order failed: ${error.message}`, { id: toastId });
       setLoading(false);
     }
     return;
-  }
+  }*/
 
   // 🎯 LOCALHOST - USE REAL RAZORPAY
   const res = await loadRazorpay();
