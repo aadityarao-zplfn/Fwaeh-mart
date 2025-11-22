@@ -454,7 +454,7 @@ useEffect(() => {
     <div className="min-h-screen p-8" style={{ background: '#fff0f3' }}>
       <div className="max-w-5xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
-        <div className="space-y-6">
+        <div className="space-y-6 max-h-[calc(100vh-180px)] overflow-y-auto pr-2 custom-scrollbar">
           {orders.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-2xl">
               <Package size={48} className="mx-auto mb-4 text-gray-400" />

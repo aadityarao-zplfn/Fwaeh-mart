@@ -81,7 +81,7 @@ const CustomerOrderHistory = () => {
         {orders.length === 0 ? (
           <p className="text-gray-600 text-center py-8">No orders yet</p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
             {orders.map((order) => (
               <div key={order.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-4">

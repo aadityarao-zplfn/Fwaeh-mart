@@ -13,7 +13,6 @@ const CustomerDashboardLayout = ({ children }) => {
     { path: '/cart', label: 'My Cart', icon: ShoppingCart },
     { path: '/orders', label: 'My Orders', icon: Package },
     { path: '/dashboard/orders', label: 'Order History', icon: Package },
-    { path: '/payment-history', label: 'Payment History', icon: CreditCard }, 
     { path: '/profile', label: 'Profile', icon: User },
   ];
 

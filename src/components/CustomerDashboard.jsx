@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Package, CreditCard, History, User, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Package, History, User, ArrowRight } from 'lucide-react';
 
 const CustomerDashboard = () => {
   return (
@@ -69,25 +69,6 @@ const CustomerDashboard = () => {
               </div>
             </div>
             <ArrowRight className="text-gray-400 group-hover:text-orange-600 transition-colors" size={20} />
-          </div>
-        </Link>
-
-        {/* Payment History Card */}
-        <Link 
-          to="/payment-history" 
-          className="bg-white p-6 rounded-2xl shadow-md border border-pink-100 hover:shadow-lg transition-all hover:border-pink-300 group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 rounded-xl">
-                <CreditCard className="text-green-600" size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900">Payment History</h3>
-                <p className="text-gray-600 text-sm">View payment records</p>
-              </div>
-            </div>
-            <ArrowRight className="text-gray-400 group-hover:text-green-600 transition-colors" size={20} />
           </div>
         </Link>
 
