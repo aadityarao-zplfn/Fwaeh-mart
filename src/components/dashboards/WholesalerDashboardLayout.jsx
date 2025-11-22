@@ -10,9 +10,8 @@ const WholesalerDashboardLayout = ({ children }) => {
     { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
     { path: '/dashboard/retailers', label: 'Retailers Network', icon: Users },
     { path: '/dashboard/transactions', label: 'Transactions with retailers', icon: CreditCard },
-    { path: '/wholesaler/shipping', label: 'Shipping Status', icon: TruckIcon }, // ✅ FIXED PATH
-      { path: '/wholesaler/queries', label: 'Queries', icon: HelpCircle }, // ← ADD THIS LINE
-
+    { path: '/wholesaler/shipping', label: 'Shipping Status', icon: TruckIcon }, 
+    { path: '/wholesaler/queries', label: 'Queries', icon: HelpCircle }, 
     { path: '/wholesaler/settings', label: 'Shop Settings', icon: Settings },
   ];
 

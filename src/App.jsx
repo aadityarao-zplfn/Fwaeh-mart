@@ -31,6 +31,7 @@ import PickupSuccess from './pages/PickupSuccess';
 import QueriesPage from './pages/QueriesPage';
 import { CartProvider } from './contexts/CartContext';
 import CustomerOrders from './pages/CustomerOrders';
+import RetailerTransactions from './pages/RetailerTransactions';
 
 function App() {
   return (
@@ -86,6 +87,17 @@ function App() {
                  <ProtectedRoute allowedRoles={['wholesaler']}>
                    <WholesalerDashboardLayout>
                      <RetailerNetwork />
+                   </WholesalerDashboardLayout>
+                 </ProtectedRoute>
+             }
+            />
+
+            <Route
+               path="/dashboard/transactions"
+               element={
+                 <ProtectedRoute allowedRoles={['wholesaler']}>
+                   <WholesalerDashboardLayout>
+                     <RetailerTransactions />
                    </WholesalerDashboardLayout>
                  </ProtectedRoute>
              }
