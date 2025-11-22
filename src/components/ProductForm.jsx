@@ -330,6 +330,7 @@ const ProductForm = ({ product, onClose }) => {
                 name="stock_quantity"
                 value={formData.stock_quantity}
                 onChange={handleChange}
+                onWheel={(e) => e.target.blur()} 
                 className="w-full px-4 py-3 rounded-xl border-2 outline-none"
                 style={{ background: '#fff5f5', borderColor: '#fca5a5', color: '#b91c1c' }}
                 required

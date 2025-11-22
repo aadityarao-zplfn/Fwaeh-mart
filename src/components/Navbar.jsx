@@ -59,6 +59,11 @@ const Navbar = () => {
             className="flex items-center text-2xl font-bold transition-all hover:opacity-80"
             style={{ color: '#b91c1c' }}
           >
+            <img 
+              src="/logo.png" 
+              alt="Fwaeh Mart Logo" 
+              className="h-10 w-10 mr-3 object-contain" 
+            />
             Fwaeh Mart
           </Link>
 

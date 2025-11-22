@@ -422,20 +422,9 @@ const updateQuantity = async (itemId, newQuantity, maxStock) => {
 
   return (
     <div style={{ background: 'linear-gradient(to bottom, #f3d7d7, #f9e5e5)' }} className="min-h-screen">
-      {/* Header */}
-      <header className="px-6 py-4 flex justify-between items-center" style={{ background: 'rgba(255, 255, 255, 0.5)' }}>
-        <h1 className="text-2xl font-bold" style={{ color: '#a94442' }}>Fwaeh Mart</h1>
-        <div className="flex gap-6 items-center">
-          <button onClick={() => navigate('/products')} className="font-medium" style={{ color: '#cd5c5c' }}>Products</button>
-          <button onClick={() => navigate('/dashboard')} className="font-medium" style={{ color: '#cd5c5c' }}>Dashboard</button>
-          <button className="px-6 py-2 rounded-lg font-medium text-white" 
-                  style={{ background: 'linear-gradient(135deg, #e57373 0%, #ef9a9a 100%)' }}>
-            Logout
-          </button>
-        </div>
-      </header>
+      
 
-      <div className="max-w-7xl mx-auto py-12 px-4">
+      <div className="max-w-7xl mx-auto py-6 px-4">
         {/* Page Header */}
         <div className="mb-8">
           <button

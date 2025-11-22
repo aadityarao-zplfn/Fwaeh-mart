@@ -671,11 +671,13 @@ const ProductManagement = () => {
                         </div>
                     )}
 
-                    {product.is_proxy && (
-                      <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Proxy Product</div>
+                    {/* MODIFIED: Show badge for Proxy Products OR Wholesaler Catalog items */}
+                    {(product.is_proxy || !product.is_public) && (
+                      <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full shadow-sm">
+                        {product.is_proxy ? 'Proxy Product' : 'Proxy Product'}
+                      </div>
                     )}
                 </div>
-
                 {/* Restock Alert Badge */}
                 {product.stock_quantity === 0 && product.restock_days && (
                    <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full z-10 font-bold flex items-center gap-1">
