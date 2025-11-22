@@ -238,7 +238,9 @@ const SellerDashboard = () => {
             </div>
           </div>
 
-          <ProductManagement />
+          <div className="max-h-[800px] overflow-y-auto pr-2 custom-scrollbar border-2 border-transparent hover:border-red-100 rounded-xl transition-all">
+            <ProductManagement />
+          </div>
 
           {/* Recent Orders Section */}
           <div 
@@ -263,7 +265,7 @@ const SellerDashboard = () => {
                 No orders yet
               </p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {orders.slice(0, 5).map((order) => (
                   <div 
                     key={order.id} 

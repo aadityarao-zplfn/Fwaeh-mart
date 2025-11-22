@@ -157,7 +157,7 @@ const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
   if (loading) return <div className="min-h-screen flex justify-center items-center"><LoadingSpinner /></div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Shipping Status</h1>
