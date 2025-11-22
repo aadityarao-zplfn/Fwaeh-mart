@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadProductImage } from '../utils/uploadImage';
 import { setStock } from '../utils/inventory';
-import { X, Upload, Plus, Edit, Save, Eye, Clock, HelpCircle } from 'lucide-react';
+import { X, Upload, Plus, Edit, Save, Eye, Clock, HelpCircle, Power, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ProductForm from './ProductForm'; // Adjust path as needed
 
@@ -32,7 +32,7 @@ const ProductManagement = () => {
   });
 
   useEffect(() => {
-    fetchProducts();
+    if (user) fetchProducts();
   }, [user]);
 
   const fetchProducts = async () => {
@@ -50,6 +50,31 @@ const ProductManagement = () => {
       toast.error('Failed to load products');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ NEW: Toggle Product Activation Status
+  const toggleProductStatus = async (product) => {
+    const newStatus = !product.is_active;
+    const toastId = toast.loading(newStatus ? 'Activating product...' : 'Deactivating product...');
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_active: newStatus })
+        .eq('id', product.id);
+
+      if (error) throw error;
+
+      // Update local state instantly
+      setProducts(products.map(p => 
+        p.id === product.id ? { ...p, is_active: newStatus } : p
+      ));
+
+      toast.success(newStatus ? 'Product is now Live' : 'Product Deactivated (Hidden)', { id: toastId });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status', { id: toastId });
     }
   };
 
@@ -365,24 +390,24 @@ const ProductManagement = () => {
           <div className="flex gap-2">
             <button
               onClick={() => handleBulkAction('activate')}
-              className="px-3 py-2 text-sm rounded-lg font-medium transition-all"
+              className="px-3 py-2 text-sm rounded-lg font-medium transition-all flex items-center gap-1"
               style={{ background: '#fff5f5', color: '#16a34a', border: '2px solid #86efac' }}
             >
-              Activate Selected
+              <CheckCircle size={14} /> Activate
             </button>
             <button
               onClick={() => handleBulkAction('deactivate')}
-              className="px-3 py-2 text-sm rounded-lg font-medium transition-all"
-              style={{ background: '#fff5f5', color: '#dc2626', border: '2px solid #fca5a5' }}
+              className="px-3 py-2 text-sm rounded-lg font-medium transition-all flex items-center gap-1"
+              style={{ background: '#fff5f5', color: '#6b7280', border: '2px solid #9ca3af' }}
             >
-              Deactivate Selected
+              <Power size={14} /> Deactivate
             </button>
             <button
               onClick={() => handleBulkAction('delete')}
-              className="px-3 py-2 text-sm rounded-lg font-medium text-white transition-all"
+              className="px-3 py-2 text-sm rounded-lg font-medium text-white transition-all flex items-center gap-1"
               style={{ background: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)' }}
             >
-              Delete Selected
+              <Trash2 size={14} /> Delete
             </button>
           </div>
         </div>
@@ -616,27 +641,42 @@ const ProductManagement = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => (
-            <div key={product.id} className="rounded-xl overflow-hidden shadow-lg" style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}>
+            <div 
+              key={product.id} 
+              className={`rounded-xl overflow-hidden shadow-lg transition-all ${!product.is_active ? 'opacity-75' : ''}`} 
+              style={{ background: '#fff5f5', border: '2px solid #fca5a5' }}
+            >
               {/* Image with hover preview */}
               <div 
-                className="relative w-full h-48 overflow-hidden"
+                className="relative w-full h-48 overflow-hidden group"
                 onMouseEnter={() => setHoveredImage(product.id)}
                 onMouseLeave={() => setHoveredImage(null)}
               >
                 <img
                   src={product.image_url || 'https://images.pexels.com/photos/4483610/pexels-photo-4483610.jpeg?auto=compress&cs=tinysrgb&w=400'}
                   alt={product.name}
-                  className="w-full h-48 object-cover transition-transform duration-300"
+                  className={`w-full h-48 object-cover transition-transform duration-300 ${!product.is_active ? 'grayscale' : ''}`}
                 />
                 
-                {/* Proxy Badge */}
-                {product.is_proxy && (
-                  <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full z-10">
-                    Proxy Product
-                  </div>
-                )}
+                {/* STATUS BADGES */}
+                <div className="absolute top-2 right-2 flex flex-col gap-1 z-10 items-end">
+                    {/* Is Active Badge */}
+                    {product.is_active ? (
+                        <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-sm flex items-center gap-1">
+                             <CheckCircle size={10} /> Active
+                        </div>
+                    ) : (
+                        <div className="bg-gray-600 text-white text-xs px-2 py-1 rounded-full font-bold shadow-sm flex items-center gap-1">
+                             <Power size={10} /> Inactive
+                        </div>
+                    )}
 
-                {/* 🚀 Restock Alert Badge (For Seller View) */}
+                    {product.is_proxy && (
+                      <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Proxy Product</div>
+                    )}
+                </div>
+
+                {/* Restock Alert Badge */}
                 {product.stock_quantity === 0 && product.restock_days && (
                    <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full z-10 font-bold flex items-center gap-1">
                      {product.restock_days === -1 ? (
@@ -655,7 +695,7 @@ const ProductManagement = () => {
         
                 {/* Image preview overlay */}
                 {hoveredImage === product.id && (
-                  <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center z-20">
+                  <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center z-20 cursor-pointer" onClick={() => handleEdit(product)}>
                     <div className="text-center text-white p-4">
                       <Eye size={32} className="mx-auto mb-2" />
                       <p className="text-sm">Click Edit to change image</p>
@@ -675,6 +715,13 @@ const ProductManagement = () => {
               </div>
 
               <div className="p-4">
+                {/* Status Alert Block if Inactive */}
+                {!product.is_active && (
+                    <div className="bg-gray-200 p-2 rounded mb-3 text-center">
+                         <p className="text-xs font-bold text-gray-600">⛔ Currently hidden from customers</p>
+                    </div>
+                )}
+
                 {/* Stock Alert */}
                 {product.stock_quantity <= 5 && product.stock_quantity > 0 && (
                   <div className="bg-orange-100 border-l-4 border-orange-500 p-3 mb-4">
@@ -727,12 +774,12 @@ const ProductManagement = () => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {editingId === product.id ? (
                     <>
                       <button
                         onClick={() => saveQuickEdit(product.id)}
-                        className="flex items-center justify-center flex-1 py-2 rounded-lg text-sm text-white transition-all"
+                        className="col-span-1 flex items-center justify-center py-2 rounded-lg text-sm text-white transition-all"
                         style={{ background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }}
                       >
                         <Save size={14} className="mr-1" />
@@ -740,7 +787,7 @@ const ProductManagement = () => {
                       </button>
                       <button
                         onClick={cancelQuickEdit}
-                        className="flex-1 py-2 rounded-lg text-sm transition-all"
+                        className="col-span-1 flex items-center justify-center py-2 rounded-lg text-sm transition-all"
                         style={{ background: '#fff5f5', color: '#b91c1c', border: '2px solid #fca5a5' }}
                       >
                         Cancel
@@ -748,27 +795,40 @@ const ProductManagement = () => {
                     </>
                   ) : (
                     <>
+                      {/* Activate/Deactivate Toggle Button */}
+                      <button 
+                        onClick={() => toggleProductStatus(product)}
+                        className={`col-span-2 flex items-center justify-center py-2 rounded-lg text-sm font-bold transition-all ${
+                          product.is_active 
+                            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
+                            : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                        }`}
+                      >
+                        <Power size={14} className="mr-1" />
+                        {product.is_active ? 'Deactivate Product' : 'Activate Product'}
+                      </button>
+
                       <button
                         onClick={() => startQuickEdit(product)}
-                        className="flex items-center justify-center flex-1 py-2 rounded-lg text-sm text-white transition-all"
+                        className="flex items-center justify-center py-2 rounded-lg text-sm text-white transition-all"
                         style={{ background: 'linear-gradient(135deg, #f87171 0%, #fca5a5 100%)' }}
                       >
                         <Edit size={14} className="mr-1" />
-                        Quick Edit
+                        Quick
                       </button>
                       <button
                         onClick={() => handleEdit(product)}
-                        className="flex-1 py-2 rounded-lg text-sm text-white transition-all"
+                        className="flex items-center justify-center py-2 rounded-lg text-sm text-white transition-all"
                         style={{ background: 'linear-gradient(135deg, #ff5757 0%, #ff8282 100%)' }}
                       >
                         Full Edit
                       </button>
                       <button
                         onClick={() => handleDelete(product.id)}
-                        className="flex-1 py-2 rounded-lg text-sm transition-all"
-                        style={{ background: '#fff5f5', color: '#b91c1c', border: '2px solid #fca5a5' }}
+                        className="col-span-2 flex items-center justify-center py-2 rounded-lg text-sm transition-all hover:bg-red-50"
+                        style={{ background: '#fff', color: '#ef4444', border: '1px solid #fca5a5' }}
                       >
-                        Delete
+                        <Trash2 size={14} className="mr-1" /> Delete
                       </button>
                     </>
                   )}
@@ -778,7 +838,7 @@ const ProductManagement = () => {
           ))}
         </div>
       )}
-      {/* ✅ ADD PRODUCT FORM MODAL - PUT THIS RIGHT HERE */}
+      {/* ✅ ADD PRODUCT FORM MODAL */}
       {showForm && (
         <ProductForm 
           product={editingProduct} 

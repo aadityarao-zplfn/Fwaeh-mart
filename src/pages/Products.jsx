@@ -10,20 +10,17 @@ import toast from 'react-hot-toast';
 import { useCart } from '../contexts/CartContext';
 
 const Products = () => {
-  const { updateCartCount } = useCart();
+  const { updateCartCount } = useCart(); 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  // ✅ CHANGE 1: Set default max price very high to avoid filtering
   const [priceRange, setPriceRange] = useState([0, 1000000]); 
   const [showInStock, setShowInStock] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [minRating, setMinRating] = useState(0);
-  
-  // ✅ CHANGE 2: Set default distance to 100 (Unlimited) so no products are hidden by default
   const [maxDistance, setMaxDistance] = useState(100); 
   
   const [sellerType, setSellerType] = useState('all');
@@ -40,10 +37,6 @@ const Products = () => {
     distance: true 
   });
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
   // Get user's current location
   useEffect(() => {
     if (navigator.geolocation) {
@@ -56,32 +49,58 @@ const Products = () => {
         },
         (error) => {
           console.log('Location access denied, using default:', error);
-          // Fallback to Secunderabad if needed, or leave null
           setUserLocation({ lat: 17.385, lng: 78.486 });
         }
       );
     }
   }, []);
 
-  // Real-time subscription
+  // Initial Fetch & Real-time Subscription
   useEffect(() => {
-    const subscription = supabase
-      .channel('product-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'products',
-        },
-        (payload) => {
-          setProducts((currentProducts) =>
-            currentProducts.map((p) =>
-              p.id === payload.new.id ? { ...p, ...payload.new } : p
-            )
-          );
+    fetchProducts();
+
+    const handleRealtimeUpdate = async (payload) => {
+      const updatedProduct = payload.new;
+
+      // CASE 1: Product Deleted or Deactivated -> REMOVE from list
+      if (payload.eventType === 'DELETE' || !updatedProduct.is_active) {
+        setProducts((current) => current.filter((p) => p.id !== (payload.old?.id || updatedProduct.id)));
+        return;
+      }
+
+      // CASE 2: Product Activated or Inserted -> ADD/UPDATE in list
+      // We must fetch the full record to get the 'seller' relation data
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select(`
+            *,
+            seller:profiles!seller_id(full_name, role, location_lat, location_lng, location_address)
+          `)
+          .eq('id', updatedProduct.id)
+          .single();
+
+        if (!error && data) {
+          // Only show if it meets visibility criteria (Retailer or Public)
+          if (data.seller?.role === 'retailer' || data.is_public) {
+            setProducts((current) => {
+              const exists = current.find((p) => p.id === data.id);
+              if (exists) {
+                return current.map((p) => (p.id === data.id ? data : p));
+              } else {
+                return [data, ...current];
+              }
+            });
+          }
         }
-      )
+      } catch (err) {
+        console.error('Error handling realtime update:', err);
+      }
+    };
+
+    const subscription = supabase
+      .channel('public-products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, handleRealtimeUpdate)
       .subscribe();
 
     return () => {
@@ -91,26 +110,26 @@ const Products = () => {
 
   const fetchProducts = async () => {
     try {
-      // Join with profiles to get seller location data
+      // Initial fetch: Only get ACTIVE products
       let query = supabase
         .from('products')
         .select(`
           *,
           seller:profiles!seller_id(full_name, role, location_lat, location_lng, location_address)
         `)
-        .eq('is_active', true)
-        .or('is_public.is.true');
+        .eq('is_active', true);
 
       const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) throw error;
 
+      // Filter for retailer/public visibility logic
       const filteredData = data.filter(product => 
         product.seller?.role === 'retailer' || product.is_public === true
       );
 
       setProducts(filteredData);
-          fetchAllProductsWithReviews(filteredData);
+      fetchAllProductsWithReviews(filteredData);
 
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -120,33 +139,77 @@ const Products = () => {
     }
   };
 
- const fetchAllProductsWithReviews = async (productsToUpdate) => {
-  try {
-    const { data: allReviews, error } = await supabase
-      .from('product_reviews')
-      .select('*');
-    
-    if (error) throw error;
-
-    // Calculate ratings for each product
-    const productsWithRatings = productsToUpdate.map(product => {
-      const productReviews = allReviews.filter(review => review.product_id === product.id);
-      const averageRating = productReviews.length > 0 
-        ? productReviews.reduce((sum, review) => sum + review.rating, 0) / productReviews.length 
-        : 0;
+  const fetchAllProductsWithReviews = async (productsToUpdate) => {
+    try {
+      const { data: allReviews, error } = await supabase
+        .from('product_reviews')
+        .select('*');
       
-      return {
-        ...product,
-        rating: averageRating,
-        review_count: productReviews.length
-      };
-    });
+      if (error) throw error;
 
-    setProducts(productsWithRatings);
-  } catch (error) {
-    console.error('Error fetching reviews:', error);
-  }
-};
+      const productsWithRatings = productsToUpdate.map(product => {
+        const productReviews = allReviews.filter(review => review.product_id === product.id);
+        const averageRating = productReviews.length > 0 
+          ? productReviews.reduce((sum, review) => sum + review.rating, 0) / productReviews.length 
+          : 0;
+        
+        return {
+          ...product,
+          rating: averageRating,
+          review_count: productReviews.length
+        };
+      });
+
+      setProducts(productsWithRatings);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    }
+  };
+
+  const addToCart = async (productId, quantity = 1) => {
+    if (!user) {
+      toast.error('Please login to add items to cart');
+      return;
+    }
+  
+    try {
+      const { data: existingItem } = await supabase
+        .from('cart_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('product_id', productId)
+        .maybeSingle();
+  
+      if (existingItem) {
+        const { error } = await supabase
+          .from('cart_items')
+          .update({ quantity: existingItem.quantity + quantity })
+          .eq('id', existingItem.id);
+  
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('cart_items')
+          .insert([{ 
+            user_id: user.id, 
+            product_id: productId, 
+            quantity: quantity 
+          }]);
+  
+        if (error) throw error;
+      }
+      
+      // Update Navbar count instantly
+      if (updateCartCount) updateCartCount(quantity);
+      
+      toast.success(`Added ${quantity} item(s) to cart!`);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add to cart');
+    }
+  };
+
+  // --- Filters & Logic ---
 
   const categories = useMemo(() => {
     return [...new Set(products.map(p => p.category))];
@@ -190,7 +253,6 @@ const Products = () => {
     }
     
     // Distance Filter
-    // Only apply filter if maxDistance is NOT 100 (which means "Unlimited")
     if (userLocation && maxDistance < 100) { 
       filtered = filtered.filter(p => {
         if (!p.seller?.location_lat || !p.seller?.location_lng) return true; 
@@ -203,7 +265,7 @@ const Products = () => {
       });
     }
 
-    // Sort
+    // Sort logic
     switch (sortBy) {
       case 'nearest':
         if (userLocation) {
@@ -238,57 +300,13 @@ const Products = () => {
     return filtered;
   }, [products, searchTerm, categoryFilter, priceRange, showInStock, sortBy, minRating, sellerType, maxDistance, userLocation]);
 
-  // In Products.jsx - Replace the existing addToCart function with this:
-
-const addToCart = async (productId, quantity = 1) => {
-  if (!user) {
-    toast.error('Please login to add items to cart');
-    return;
-  }
-
-  try {
-    const { data: existingItem } = await supabase
-      .from('cart_items')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('product_id', productId)
-      .maybeSingle();
-
-    if (existingItem) {
-      const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity: existingItem.quantity + quantity })
-        .eq('id', existingItem.id);
-
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('cart_items')
-        .insert([{ 
-          user_id: user.id, 
-          product_id: productId, 
-          quantity: quantity 
-        }]);
-
-      if (error) throw error;
-    }
-// ✅ IMMEDIATELY UPDATE NAVBAR CART COUNT
-      updateCartCount(quantity);
-      
-      toast.success(`Added ${quantity} item(s) to cart!`);
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      toast.error('Failed to add to cart');
-  }
-};
-
   const clearFilters = () => {
     setSearchTerm('');
     setCategoryFilter('all');
     setSortBy('newest');
     setShowInStock(false);
     setMinRating(0);
-    setMaxDistance(100); // Reset to Unlimited
+    setMaxDistance(100);
     setSellerType('all');
     setPriceRange([0, maxPrice]);
   };
@@ -298,7 +316,7 @@ const addToCart = async (productId, quantity = 1) => {
     showInStock,
     minRating > 0,
     sellerType !== 'all',
-    maxDistance < 100, // Only counts if distance is restricted
+    maxDistance < 100,
     priceRange[0] > 0 || priceRange[1] < maxPrice
   ].filter(Boolean).length;
 
@@ -715,13 +733,13 @@ const addToCart = async (productId, quantity = 1) => {
                 onClick={() => setSelectedProduct(product)}
                 className="cursor-pointer"
               >
-<ProductCard
-  product={product}
-  onAddToCart={addToCart}
-  userLocation={userLocation}
-  rating={product.rating || 0}
-  reviewCount={product.review_count || 0}
-/>
+                <ProductCard
+                  product={product}
+                  onAddToCart={addToCart}
+                  userLocation={userLocation}
+                  rating={product.rating || 0}
+                  reviewCount={product.review_count || 0}
+                />
               </div>
             ))}
           </div>
