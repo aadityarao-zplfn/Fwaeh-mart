@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Truck, Box, MapPin, Clock, ArrowUpRight } from 'lucide-react';
+import { Truck, Box, MapPin, Clock, ArrowUpRight, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 
@@ -15,130 +15,138 @@ const ShippingStatus = () => {
       fetchOrdersToShip();
       
       const subscription = supabase
-        .channel('orders-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'orders',
-            filter: `status=eq.pending`
-          },
-          (payload) => {
-            console.log('🔔 Real-time order change detected:', payload);
-            fetchOrdersToShip();
-          }
+        .channel('shipping-updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, 
+          () => fetchOrdersToShip()
         )
         .subscribe();
 
-      return () => {
-        subscription.unsubscribe();
-      };
+      return () => { subscription.unsubscribe(); };
     }
   }, [user, profile]);
 
   const fetchOrdersToShip = async () => {
     try {
       setLoading(true);
-  
-      const { data: orderItems, error: itemsError } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('seller_id', user.id)
-        .order('created_at', { ascending: false });
-  
-      if (itemsError) throw itemsError;
-  
-      if (!orderItems || orderItems.length === 0) {
+      let relevantOrderItems = [];
+
+      if (profile.role === 'retailer') {
+        // --- RETAILER VIEW ---
+        const { data: myItems, error } = await supabase
+          .from('order_items')
+          // FIX: Explicitly specify the foreign key relationship
+          .select(`*, products:products!order_items_product_id_fkey!inner(name, image_url, is_proxy)`)
+          .eq('seller_id', user.id);
+        
+        if (error) throw error;
+        
+        relevantOrderItems = myItems.filter(item => item.products.is_proxy === false);
+
+      } else if (profile.role === 'wholesaler') {
+        // --- WHOLESALER VIEW ---
+        
+        // 1. DIRECT SALES
+        const { data: directItems, error: directError } = await supabase
+          .from('order_items')
+          // FIX: Explicitly specify the foreign key relationship
+          .select(`*, products:products!order_items_product_id_fkey!inner(name, image_url, is_proxy)`)
+          .eq('seller_id', user.id);
+        
+        if (directError) throw directError;
+
+        // 2. PROXY SALES
+        const { data: mySuppliedProducts } = await supabase
+          .from('products')
+          .select('id')
+          .eq('wholesaler_id', user.id);
+          
+        let proxyItems = [];
+        const productIds = mySuppliedProducts?.map(p => p.id) || [];
+
+        if (productIds.length > 0) {
+            const { data: pItems, error: pError } = await supabase
+                .from('order_items')
+                // FIX: Explicitly specify the foreign key relationship
+                .select(`*, products:products!order_items_product_id_fkey!inner(name, image_url, is_proxy)`)
+                .in('product_id', productIds);
+            
+            if (pError) throw pError;
+            proxyItems = pItems || [];
+        }
+
+        relevantOrderItems = [...(directItems || []), ...proxyItems];
+      }
+
+      if (relevantOrderItems.length === 0) {
         setOrders([]);
+        setLoading(false);
         return;
       }
-  
-      const orderIds = [...new Set(orderItems.map(item => item.order_id))];
-  
+
+      const orderIds = [...new Set(relevantOrderItems.map(item => item.order_id))];
+      
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
         .in('id', orderIds)
-        .eq('status', 'pending')
+        .neq('status', 'delivered') 
+        .neq('status', 'cancelled')
         .order('created_at', { ascending: true });
-  
+
       if (ordersError) throw ordersError;
-  
-      const productIds = [...new Set(orderItems.map(item => item.product_id))];
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .in('id', productIds);
-  
-      if (productsError) console.log('⚠️ Products fetch error:', productsError);
-  
-      const productMap = new Map(products?.map(p => [p.id, p]) || []);
-      const itemsMap = new Map();
-  
-      orderItems.forEach(item => {
-        if (!itemsMap.has(item.order_id)) {
-          itemsMap.set(item.order_id, []);
+
+      const combinedOrders = ordersData.reduce((acc, order) => {
+        const itemsInOrder = relevantOrderItems.filter(item => item.order_id === order.id);
+
+        if (itemsInOrder.length === 0) return acc;
+
+        const isProxyGroup = itemsInOrder.some(item => item.products.is_proxy === true);
+
+        if (profile.role === 'wholesaler' && isProxyGroup) {
+            if (!order.wholesaler_payment_made) {
+                return acc;
+            }
         }
-        itemsMap.get(item.order_id).push({
-          ...item,
-          products: productMap.get(item.product_id) || { 
-            name: 'Unknown Product', 
-            image_url: null,
-            is_proxy: false
-          }
+
+        acc.push({
+            ...order,
+            order_items: itemsInOrder,
+            is_proxy_shipment: isProxyGroup
         });
-      });
-  
-      const combinedOrders = ordersData.map(order => ({
-        ...order,
-        order_items: itemsMap.get(order.id) || []
-      }));
-  
+        
+        return acc;
+      }, []);
+
       setOrders(combinedOrders);
-  
+
     } catch (error) {
       console.error('❌ Error fetching shipping tasks:', error);
+      // Clean error message for UI
       toast.error('Failed to load shipping tasks');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleShipOrder = async (orderId, orderType, linkedOrderId) => {
+  const handleShipOrder = async (orderId) => {
     const toastId = toast.loading('Dispatching order...');
-  
     try {
-      const timestamp = new Date().toISOString();
-      
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('orders')
         .update({ 
           status: 'in_transit',
-          shipped_at: timestamp 
+          shipped_at: new Date().toISOString() 
         })
         .eq('id', orderId);
   
-      if (updateError) throw updateError;
+      if (error) throw error;
   
-      if (linkedOrderId) {
-        const { error: linkedError } = await supabase
-          .from('orders')
-          .update({ 
-            status: 'in_transit',
-            shipped_at: timestamp 
-          })
-          .eq('id', linkedOrderId);
-        
-        if (linkedError) throw linkedError;
-      }
-  
-      toast.success('Order dispatched! It will auto-complete in 3 minutes.', { id: toastId });
+      toast.success('Order dispatched successfully!', { id: toastId });
       setOrders(prev => prev.filter(o => o.id !== orderId));
   
     } catch (error) {
       console.error('Shipping error:', error);
-      toast.error('Failed to update status: ' + error.message, { id: toastId });
+      toast.error('Failed to update status', { id: toastId });
     }
   };
 
@@ -151,41 +159,47 @@ const ShippingStatus = () => {
           <h1 className="text-2xl font-bold text-gray-900">Shipping Status</h1>
           <p className="text-gray-500">
             {profile?.role === 'retailer' 
-              ? 'Dispatch your products and proxy orders' 
-              : 'Dispatch your products and retailer fulfillment orders'}
+              ? 'Manage shipments for your physical stock' 
+              : 'Manage direct orders & inbound proxy fulfillments'}
           </p>
         </div>
-        <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
-          <span className="text-blue-600 font-bold">{orders.length}</span> to ship
+        <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100">
+          <span className="text-red-600 font-bold">{orders.length}</span> pending
         </div>
       </div>
 
       {orders.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
           <Truck size={48} className="mx-auto mb-4 text-green-500" />
-          <h3 className="text-xl font-bold text-gray-800">All Orders Shipped!</h3>
-          <p className="text-gray-500">No pending shipping requests.</p>
+          <h3 className="text-xl font-bold text-gray-800">All Caught Up!</h3>
+          <p className="text-gray-500">No orders pending shipment.</p>
         </div>
       ) : (
         <div className="grid gap-6">
           {orders.map((order) => (
-            <div key={order.id} className="bg-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all border border-blue-50">
+            <div key={order.id} className="bg-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all border border-red-100">
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-3">
-                  {/* Updated Order ID and Status Section */}
                   <div className="flex items-center gap-3 mb-3">
                     <span className="text-sm text-gray-500 font-mono">#{order.id.slice(0, 8)}</span>
-                    <span className="flex items-center text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded font-bold">
-                      <Clock size={12} className="mr-1" /> Pending Shipment
+                    <span className={`flex items-center text-xs px-2 py-1 rounded font-bold ${
+                        order.status === 'processing' ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-50 text-orange-600'
+                    }`}>
+                      <Clock size={12} className="mr-1" /> {order.status.toUpperCase()}
                     </span>
-                    {order.wholesaler_fulfillment_order_id && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-bold">
-                        {profile?.role === 'retailer' ? 'My Proxy Order' : 'Retailer Fulfillment'}
-                      </span>
+                    
+                    {profile.role === 'wholesaler' && order.is_proxy_shipment && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-bold flex items-center">
+                            <AlertCircle size={10} className="mr-1"/> PROXY (PAID)
+                        </span>
+                    )}
+                    {profile.role === 'wholesaler' && !order.is_proxy_shipment && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold">
+                            DIRECT SALE
+                        </span>
                     )}
                   </div>
 
-                  {/* Product Names */}
                   <div className="mb-3">
                     <p className="text-sm font-medium text-gray-700">
                       {order.order_items?.map((item, index) => (
@@ -197,32 +211,18 @@ const ShippingStatus = () => {
                     </p>
                   </div>
 
-                  {/* Shipping Address */}
                   <div className="flex items-start gap-3">
                     <MapPin className="text-gray-400 mt-0.5" size={16} />
                     <p className="text-sm text-gray-600 font-medium">{order.shipping_address}</p>
                   </div>
-
-                  {/* Product Images */}
-                  <div className="flex items-center gap-2 mt-3">
-                    {order.order_items?.map((item, i) => (
-                      <img 
-                        key={i} 
-                        src={item.products?.image_url || '/placeholder.svg'} 
-                        className="w-8 h-8 rounded-lg border border-gray-200 object-cover" 
-                        alt={item.products?.name} 
-                      />
-                    ))}
-                  </div>
                 </div>
                 
-                {/* Dispatch Button */}
                 <div className="flex items-center justify-end">
                   <button
-                    onClick={() => handleShipOrder(order.id, order.order_type, order.wholesaler_fulfillment_order_id)}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center gap-2 text-sm"
+                    onClick={() => handleShipOrder(order.id)}
+                    className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center gap-2 text-sm"
                   >
-                    <Box size={16} /> Dispatch <ArrowUpRight size={14} />
+                    <Box size={16} /> Dispatch Order <ArrowUpRight size={14} />
                   </button>
                 </div>
               </div>
