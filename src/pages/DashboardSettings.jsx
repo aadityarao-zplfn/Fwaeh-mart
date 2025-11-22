@@ -5,6 +5,9 @@ import LocationPicker from '../components/LocationPicker';
 import { Save, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+
+
 const DashboardSettings = () => {
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -37,32 +40,39 @@ const DashboardSettings = () => {
     }));
   };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+ const handleSave = async (e) => {
+  e.preventDefault();
+  
+  // ADD PHONE VALIDATION
+  if (formData.phone && !PHONE_REGEX.test(formData.phone)) {
+    toast.error('Please enter a valid 10-digit phone number');
+    return;
+  }
+  
+  setLoading(true);
 
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.full_name,
-          phone: formData.phone,
-          location_lat: formData.location_lat,
-          location_lng: formData.location_lng,
-          location_address: formData.location_address,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: formData.full_name,
+        phone: formData.phone,
+        location_lat: formData.location_lat,
+        location_lng: formData.location_lng,
+        location_address: formData.location_address,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id);
 
-      if (error) throw error;
-      toast.success('Shop settings updated successfully!');
-    } catch (error) {
-      console.error('Error updating settings:', error);
-      toast.error('Failed to update settings');
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (error) throw error;
+    toast.success('Shop settings updated successfully!');
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    toast.error('Failed to update settings');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -82,15 +92,19 @@ const DashboardSettings = () => {
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-200 outline-none"
               />
             </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700">Phone Number</label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-200 outline-none"
-              />
-            </div>
+         <div>
+  <label className="block text-sm font-semibold mb-2 text-gray-700">Phone Number</label>
+  <input
+    type="tel"
+    value={formData.phone}
+    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+    onInput={(e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+    }}
+    placeholder="10 digit phone number"
+    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-200 outline-none"
+  />
+</div>
           </div>
 
           {/* Location Picker */}

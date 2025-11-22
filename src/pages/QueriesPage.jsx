@@ -20,66 +20,36 @@ export default function QueriesPage() {
    // checkAllQueries();
   }, []);
 
-  const fetchQueries = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+const fetchQueries = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      console.log('Fetching queries for retailer:', user.id);
+    console.log('🔄 1. Starting fetchQueries');
+    
+    const { data, error } = await supabase
+      .from('customer_queries')
+      .select('*')
+      .eq('retailer_id', user.id)
+      .order('created_at', { ascending: false });
 
-      const { data, error } = await supabase
-        .from('customer_queries')
-        .select('*')
-        .eq('retailer_id', user.id)
-        .order('created_at', { ascending: false });
+    console.log('📊 2. Queries data:', data);
+    console.log('❌ 3. Queries error:', error);
+    console.log('👤 4. User ID:', user.id);
 
-      console.log('Queries data:', data);
-      console.log('Queries error:', error);
+    if (error) throw error;
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      // If we have queries, fetch user emails separately
-      const queriesWithUserData = await Promise.all(
-        (data || []).map(async (query) => {
-          let customer_email = 'Customer';
-          
-          try {
-            const { data: userData } = await supabase
-              .from('profiles')
-              .select('email')
-              .eq('id', query.user_id)
-              .single();
-            
-            customer_email = userData?.email || 'Customer';
-          } catch (error) {
-            console.log('Using fallback for customer email');
-          }
-
-          const { data: productData } = await supabase
-            .from('products')
-            .select('name')
-            .eq('id', query.product_id)
-            .single();
-
-          return {
-            ...query,
-            customer_email: customer_email,
-            product_name: productData?.name || 'Product'
-          };
-        })
-      );
-
-      setQueries(queriesWithUserData);
-    } catch (error) {
-      console.error('Error fetching queries:', error);
-      toast.error('Failed to load queries: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('✅ 5. Setting queries to:', data || []);
+    setQueries(data || []);
+    
+  } catch (error) {
+    console.error('🚨 6. Error in fetchQueries:', error);
+    toast.error('Failed to load queries: ' + error.message);
+  } finally {
+    console.log('🏁 7. Setting loading to false');
+    setLoading(false);
+  }
+};
 
   const submitResponse = async (e) => {
     e.preventDefault();

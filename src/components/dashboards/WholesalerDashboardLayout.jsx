@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, TruckIcon, BarChart3, Users, CreditCard, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, HelpCircle, TruckIcon, BarChart3, Users, CreditCard, Settings, Menu, X } from 'lucide-react';
 
 const WholesalerDashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -11,6 +11,8 @@ const WholesalerDashboardLayout = ({ children }) => {
     { path: '/dashboard/retailers', label: 'Retailers Network', icon: Users },
     { path: '/dashboard/transactions', label: 'Transactions with retailers', icon: CreditCard },
     { path: '/wholesaler/shipping', label: 'Shipping Status', icon: TruckIcon }, // ✅ FIXED PATH
+      { path: '/wholesaler/queries', label: 'Queries', icon: HelpCircle }, // ← ADD THIS LINE
+
     { path: '/wholesaler/settings', label: 'Shop Settings', icon: Settings },
   ];
 

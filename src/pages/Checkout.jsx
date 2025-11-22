@@ -5,6 +5,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, CheckCircle, Lock, ArrowLeft, MapPin, Phone, Mail, User, Package, Banknote, Smartphone, Shield, Edit2, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+const CITY_REGEX = /^[a-zA-Z\s\-'.]+$/;
+const STATE_REGEX = /^[a-zA-Z\s\-'.]+$/;
+const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+
 const Checkout = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [cartItems, setCartItems] = useState([]);
@@ -80,22 +85,38 @@ const Checkout = () => {
     return { subtotal, tax, shipping, total };
   };
 
-  const validateStep1 = () => {
-    if (!shippingInfo.fullName || !shippingInfo.email || !shippingInfo.phone || !shippingInfo.address || !shippingInfo.city || !shippingInfo.state || !shippingInfo.pincode) {
-      toast.error('Please fill all shipping information');
-      return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(shippingInfo.email)) {
-      toast.error('Please enter a valid email');
-      return false;
-    }
-    if (shippingInfo.phone.length < 10) {
-      toast.error('Please enter a valid phone number');
-      return false;
-    }
-    return true;
-  };
+const validateStep1 = () => {
+  if (!shippingInfo.fullName || !shippingInfo.email || !shippingInfo.phone || !shippingInfo.address || !shippingInfo.city || !shippingInfo.state || !shippingInfo.pincode) {
+    toast.error('Please fill all shipping information');
+    return false;
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(shippingInfo.email)) {
+    toast.error('Please enter a valid email');
+    return false;
+  }
+  // REPLACE PHONE VALIDATION:
+  if (!PHONE_REGEX.test(shippingInfo.phone)) {
+    toast.error('Please enter a valid 10-digit phone number');
+    return false;
+  }
+  // ADD CITY VALIDATION:
+  if (!CITY_REGEX.test(shippingInfo.city)) {
+    toast.error('Please enter a valid city name (letters, spaces, hyphens, apostrophes only)');
+    return false;
+  }
+  // ADD STATE VALIDATION:
+  if (!STATE_REGEX.test(shippingInfo.state)) {
+    toast.error('Please enter a valid state name (letters, spaces, hyphens, apostrophes only)');
+    return false;
+  }
+  // ADD PINCODE VALIDATION:
+  if (!PINCODE_REGEX.test(shippingInfo.pincode)) {
+    toast.error('Please enter a valid 6-digit pin code (first digit cannot be 0)');
+    return false;
+  }
+  return true;
+};
 
   const handleNext = () => {
     if (currentStep === 1 && !validateStep1()) return;
@@ -285,21 +306,24 @@ const orderItemsData = cartItems.map((item) => ({
                           style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
-                          <Phone size={16} className="inline mr-2" />
-                          Phone Number *
-                        </label>
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={shippingInfo.phone}
-                          onChange={handleShippingChange}
-                          placeholder="+91 XXXXX XXXXX"
-                          className="w-full px-4 py-3 rounded-lg outline-none font-medium"
-                          style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
-                        />
-                      </div>
+                    <div>
+  <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
+    <Phone size={16} className="inline mr-2" />
+    Phone Number *
+  </label>
+  <input
+    type="tel"
+    name="phone"
+    value={shippingInfo.phone}
+    onChange={handleShippingChange}
+    onInput={(e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+    }}
+    placeholder="10 digit phone number"
+    className="w-full px-4 py-3 rounded-lg outline-none font-medium"
+    style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
+  />
+</div>
                     </div>
                     <div>
                       <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
@@ -317,48 +341,57 @@ const orderItemsData = cartItems.map((item) => ({
                       />
                     </div>
                     <div className="grid md:grid-cols-3 gap-5">
-                      <div>
-                        <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
-                          City *
-                        </label>
-                        <input
-                          type="text"
-                          name="city"
-                          value={shippingInfo.city}
-                          onChange={handleShippingChange}
-                          placeholder="City"
-                          className="w-full px-4 py-3 rounded-lg outline-none font-medium"
-                          style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
-                          State *
-                        </label>
-                        <input
-                          type="text"
-                          name="state"
-                          value={shippingInfo.state}
-                          onChange={handleShippingChange}
-                          placeholder="State"
-                          className="w-full px-4 py-3 rounded-lg outline-none font-medium"
-                          style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
-                          Pincode *
-                        </label>
-                        <input
-                          type="text"
-                          name="pincode"
-                          value={shippingInfo.pincode}
-                          onChange={handleShippingChange}
-                          placeholder="000000"
-                          className="w-full px-4 py-3 rounded-lg outline-none font-medium"
-                          style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
-                        />
-                      </div>
+                    <div>
+  <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
+    City *
+  </label>
+  <input
+    type="text"
+    name="city"
+    value={shippingInfo.city}
+    onChange={handleShippingChange}
+    onInput={(e) => {
+      e.target.value = e.target.value.replace(/[^a-zA-Z\s\-'.]/g, '');
+    }}
+    placeholder="City"
+    className="w-full px-4 py-3 rounded-lg outline-none font-medium"
+    style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
+  />
+</div>
+                     <div>
+  <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
+    State *
+  </label>
+  <input
+    type="text"
+    name="state"
+    value={shippingInfo.state}
+    onChange={handleShippingChange}
+    onInput={(e) => {
+      e.target.value = e.target.value.replace(/[^a-zA-Z\s\-'.]/g, '');
+    }}
+    placeholder="State"
+    className="w-full px-4 py-3 rounded-lg outline-none font-medium"
+    style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
+  />
+</div>
+                     <div>
+  <label className="block text-sm font-bold mb-2" style={{ color: '#a94442' }}>
+    Pincode *
+  </label>
+  <input
+    type="text"
+    name="pincode"
+    value={shippingInfo.pincode}
+    onChange={handleShippingChange}
+    onInput={(e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+    }}
+    placeholder="6 digit pin code"
+    className="w-full px-4 py-3 rounded-lg outline-none font-medium"
+    style={{ background: 'rgba(255, 255, 255, 0.9)', color: '#a94442', border: '2px solid #f8b4b4' }}
+  />
+</div>
                     </div>
                     <div className="pt-4">
                       <label className="flex items-center gap-3 cursor-pointer">

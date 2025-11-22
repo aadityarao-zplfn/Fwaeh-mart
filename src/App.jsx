@@ -250,6 +250,17 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            // Wholesaler Queries Route
+<Route 
+  path="/wholesaler/queries" 
+  element={
+    <ProtectedRoute allowedRoles={['wholesaler']}>
+      <WholesalerDashboardLayout>
+        <QueriesPage />
+      </WholesalerDashboardLayout>
+    </ProtectedRoute>
+  } 
+/>
             <Route 
               path="/pickup-success" 
               element={

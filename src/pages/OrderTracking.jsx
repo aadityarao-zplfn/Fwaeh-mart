@@ -4,6 +4,11 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+const CITY_REGEX = /^[a-zA-Z\s\-']+$/;
+const STATE_REGEX = /^[a-zA-Z\s\-']+$/;
+const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+
 export default function OrderTrackingPage() {
   const [view, setView] = useState('list');
   const [selectedOrder, setSelectedOrder] = useState(null);
