@@ -4,25 +4,18 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-const PHONE_REGEX = /^[0-9]{10}$/;
-const CITY_REGEX = /^[a-zA-Z\s\-']+$/;
-const STATE_REGEX = /^[a-zA-Z\s\-']+$/;
-const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
-
 export default function OrderTrackingPage() {
   const [view, setView] = useState('list');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [reviews, setReviews] = useState({});
   const [showQueryModal, setShowQueryModal] = useState(false);
   const [querySubject, setQuerySubject] = useState('');
   const [queryMessage, setQueryMessage] = useState('');
   const [submittingQuery, setSubmittingQuery] = useState(false);
   const navigate = useNavigate();
 
-  // Add this inside your OrderTrackingPage component
-useEffect(() => { 
+  useEffect(() => { 
     fetchOrders(); 
   }, []);
 
@@ -56,9 +49,10 @@ useEffect(() => {
 
           const itemsWithProducts = await Promise.all(
             (items || []).map(async (item) => {
-              const { data: product, error: productError } = await supabase
+              // UPDATED: Fetch is_proxy to determine status flow
+              const { data: product } = await supabase
                 .from('products')
-                .select('name, image_url')
+                .select('name, image_url, is_proxy')
                 .eq('id', item.product_id)
                 .single();
 
@@ -70,7 +64,7 @@ useEffect(() => {
 
               return {
                 ...item,
-                products: product || { name: 'Product', image_url: '' },
+                products: product || { name: 'Product', image_url: '', is_proxy: false },
                 review: review || null
               };
             })
@@ -88,7 +82,7 @@ useEffect(() => {
         ordersWithDetails.map(async (order) => {
           if (order.fulfillment_type !== 'offline_pickup' && order.status === 'in_transit' && order.shipped_at) {
             const timeSinceShipped = Date.now() - new Date(order.shipped_at).getTime();
-            if (timeSinceShipped > 180000) {
+            if (timeSinceShipped > 180000) { // 3 minutes demo auto-complete
               try {
                 const { error: updateError } = await supabase
                   .from('orders')
@@ -185,7 +179,7 @@ useEffect(() => {
 
       if (productId) {
         try {
-          const { data: product, error: productError } = await supabase
+          const { data: product } = await supabase
             .from('products')
             .select('*')
             .eq('id', productId)
@@ -231,9 +225,12 @@ useEffect(() => {
 
   if (view === 'detail' && selectedOrder) {
     const isOffline = selectedOrder.fulfillment_type === 'offline_pickup';
-    const statusFlow = isOffline 
-      ? ['pending', 'delivered']
-      : ['pending', 'in_transit', 'delivered'];
+    const isProxyOrder = selectedOrder.order_items.some(item => item.products?.is_proxy);
+
+    // Status Flow Logic
+    // Online: Pending -> In Transit -> Delivered
+    // Offline: Pending (Scheduled) -> In Transit (At Store OR On Way) -> Delivered (Picked Up)
+    const statusFlow = ['pending', 'in_transit', 'delivered'];
     const currentStatusIndex = statusFlow.indexOf(selectedOrder.status);
     
     return (
@@ -254,7 +251,7 @@ useEffect(() => {
             </div>
             
             <div className="flex gap-3">
-              {isOffline && selectedOrder.status === 'pending' && (
+              {isOffline && (selectedOrder.status === 'in_transit' || selectedOrder.status === 'pending') && (
                 <button 
                   onClick={() => openPickupConfirmation(selectedOrder)}
                   className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold flex items-center gap-2 transition-all shadow-md"
@@ -279,11 +276,20 @@ useEffect(() => {
               const isCurrent = i === currentStatusIndex;
               
               let label = step;
-              if(isOffline) {
-                if(step === 'pending') label = 'Scheduled';
-                if(step === 'delivered') label = 'Picked Up';
+              // Custom Labels for Offline Flow
+              if (isOffline) {
+                if (step === 'pending') label = 'Scheduled';
+                if (step === 'in_transit') {
+                    // Case 1 & 2: Direct Sale = Already at store (Retailer marked it ready)
+                    // Case 3: Proxy Sale = Wholesaler sent it, so it's "On Way" to store
+                    label = isProxyOrder ? 'On Way to Store' : 'At the store';
+                }
+                if (step === 'delivered') label = 'Picked Up';
               } else {
-                if(step === 'in_transit') label = 'In Transit';
+                // Standard Online Flow
+                if (step === 'pending') label = 'Processing';
+                if (step === 'in_transit') label = 'In Transit';
+                if (step === 'delivered') label = 'Delivered';
               }
 
               return (
@@ -291,8 +297,8 @@ useEffect(() => {
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center border-4 ${
                     isActive ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-300 text-gray-300'
                   } ${isCurrent ? 'ring-4 ring-green-200' : ''}`}>
-                    {step.includes('pending') && <Clock size={20} />}
-                    {step === 'in_transit' && <Truck size={20} />}
+                    {step === 'pending' && <Clock size={20} />}
+                    {step === 'in_transit' && (isOffline && !isProxyOrder ? <Store size={20} /> : <Truck size={20} />)}
                     {step === 'delivered' && <CheckCircle size={20} />}
                   </div>
                   <span className={`mt-2 font-bold capitalize text-sm ${
@@ -472,44 +478,45 @@ useEffect(() => {
             return (
               <div key={order.id} className="bg-white p-6 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                <div>
-  <div className="flex items-center gap-3 mb-1">
-    <h3 className="font-bold text-lg">
-      {order.order_items?.length === 1 
-        ? order.order_items[0]?.products?.name || 'Order'
-        : `${order.order_items?.length} Items`
-      }
-    </h3>
-    {isOffline && (
-      <span className="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded font-bold flex items-center">
-        <Store size={12} className="mr-1"/> Pickup
-      </span>
-    )}
-  </div>
-  <p className="text-gray-500 text-sm mb-1">
-    Order #{order.id.slice(0,8)} • {new Date(order.created_at).toLocaleDateString()}
-  </p>
-  
-  <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold capitalize 
-    ${order.status === 'delivered' ? 'bg-green-100 text-green-700' : 
-      order.status === 'pending' && isOffline ? 'bg-orange-100 text-orange-700' : 
-      order.status === 'in_transit' ? 'bg-blue-100 text-blue-700' : 
-      'bg-yellow-100 text-yellow-700'}`}>
-    {isOffline && order.status === 'pending' ? 'Waiting for Pickup' : 
-      order.status === 'in_transit' ? 'In Transit' : order.status}
-  </span>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-bold text-lg">
+                      {order.order_items?.length === 1 
+                        ? order.order_items[0]?.products?.name || 'Order'
+                        : `${order.order_items?.length} Items`
+                      }
+                    </h3>
+                    {isOffline && (
+                      <span className="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded font-bold flex items-center">
+                        <Store size={12} className="mr-1"/> Pickup
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-500 text-sm mb-1">
+                    Order #{order.id.slice(0,8)} • {new Date(order.created_at).toLocaleDateString()}
+                  </p>
+                  
+                  <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold capitalize 
+                    ${order.status === 'delivered' ? 'bg-green-100 text-green-700' : 
+                      order.status === 'pending' && isOffline ? 'bg-orange-100 text-orange-700' : 
+                      order.status === 'in_transit' ? 'bg-blue-100 text-blue-700' : 
+                      'bg-yellow-100 text-yellow-700'}`}>
+                    {isOffline && order.status === 'pending' ? 'Scheduled' : 
+                     isOffline && order.status === 'in_transit' ? 'Ready/On Way' :
+                     order.status}
+                  </span>
 
-  {isOffline && order.scheduled_at && order.status === 'pending' && (
-    <p className="text-xs text-gray-500 mt-1">
-      Pickup: {new Date(order.scheduled_at).toLocaleString([], { 
-        dateStyle: 'short', 
-        timeStyle: 'short' 
-      })}
-    </p>
-  )}
-</div>
+                  {isOffline && order.scheduled_at && order.status === 'pending' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Pickup: {new Date(order.scheduled_at).toLocaleString([], { 
+                        dateStyle: 'short', 
+                        timeStyle: 'short' 
+                      })}
+                    </p>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-3">
-                  {isOffline && order.status === 'pending' && (
+                  {isOffline && (order.status === 'pending' || order.status === 'in_transit') && (
                     <button 
                       onClick={() => openPickupConfirmation(order)}
                       className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-all flex items-center gap-2 text-sm shadow-sm"
@@ -522,7 +529,7 @@ useEffect(() => {
                     onClick={() => { setSelectedOrder(order); setView('detail'); }} 
                     className="px-6 py-3 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 transition-all flex items-center gap-2"
                   >
-                    <Eye size={18} /> View Details & Track
+                    <Eye size={18} /> View & Track
                   </button>
                 </div>
               </div>
@@ -534,7 +541,6 @@ useEffect(() => {
   );
 }
 
-// Keep the ReviewForm and QueryResponses components exactly as you had them
 // Review Form Component
 const ReviewForm = ({ orderItemId, productId, productName, onSubmit }) => {
   const [rating, setRating] = useState(0);

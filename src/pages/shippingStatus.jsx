@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Truck, Box, MapPin, Clock, ArrowUpRight, AlertCircle } from 'lucide-react';
+import { Truck, Box, MapPin, Clock, ArrowUpRight, AlertCircle, Store, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 
@@ -30,31 +30,37 @@ const ShippingStatus = () => {
       setLoading(true);
       let relevantOrderItems = [];
 
+      // Common select part including Seller (Retailer) details
+      // We fetch the seller profile to know WHERE to ship for proxy orders
+      const selectQuery = `
+        *,
+        products:products!order_items_product_id_fkey!inner(name, image_url, is_proxy),
+        seller:profiles!seller_id(full_name, address, location_address)
+      `;
+
       if (profile.role === 'retailer') {
         // --- RETAILER VIEW ---
         const { data: myItems, error } = await supabase
           .from('order_items')
-          // FIX: Explicitly specify the foreign key relationship
-          .select(`*, products:products!order_items_product_id_fkey!inner(name, image_url, is_proxy)`)
+          .select(selectQuery)
           .eq('seller_id', user.id);
         
         if (error) throw error;
-        
+        // Retailer only ships their OWN stock (not proxy items they bought)
         relevantOrderItems = myItems.filter(item => item.products.is_proxy === false);
 
       } else if (profile.role === 'wholesaler') {
         // --- WHOLESALER VIEW ---
         
-        // 1. DIRECT SALES
+        // 1. DIRECT SALES (Wholesaler selling directly to customer)
         const { data: directItems, error: directError } = await supabase
           .from('order_items')
-          // FIX: Explicitly specify the foreign key relationship
-          .select(`*, products:products!order_items_product_id_fkey!inner(name, image_url, is_proxy)`)
+          .select(selectQuery)
           .eq('seller_id', user.id);
         
         if (directError) throw directError;
 
-        // 2. PROXY SALES
+        // 2. PROXY SALES (Retailer selling Wholesaler's product)
         const { data: mySuppliedProducts } = await supabase
           .from('products')
           .select('id')
@@ -66,8 +72,7 @@ const ShippingStatus = () => {
         if (productIds.length > 0) {
             const { data: pItems, error: pError } = await supabase
                 .from('order_items')
-                // FIX: Explicitly specify the foreign key relationship
-                .select(`*, products:products!order_items_product_id_fkey!inner(name, image_url, is_proxy)`)
+                .select(selectQuery)
                 .in('product_id', productIds);
             
             if (pError) throw pError;
@@ -89,8 +94,6 @@ const ShippingStatus = () => {
         .from('orders')
         .select('*')
         .in('id', orderIds)
-        //.neq('status', 'delivered') 
-        //.neq('status', 'cancelled')
         .in('status', ['pending', 'processing'])
         .order('created_at', { ascending: true });
 
@@ -103,6 +106,7 @@ const ShippingStatus = () => {
 
         const isProxyGroup = itemsInOrder.some(item => item.products.is_proxy === true);
 
+        // For Wholesaler Proxy: Only show if Retailer has paid
         if (profile.role === 'wholesaler' && isProxyGroup) {
             if (!order.wholesaler_payment_made) {
                 return acc;
@@ -122,7 +126,6 @@ const ShippingStatus = () => {
 
     } catch (error) {
       console.error('❌ Error fetching shipping tasks:', error);
-      // Clean error message for UI
       toast.error('Failed to load shipping tasks');
     } finally {
       setLoading(false);
@@ -130,19 +133,19 @@ const ShippingStatus = () => {
   };
 
   const handleShipOrder = async (orderId) => {
-    const toastId = toast.loading('Dispatching order...');
+    const toastId = toast.loading('Updating status...');
     try {
       const { error } = await supabase
         .from('orders')
         .update({ 
-          status: 'in_transit',
+          status: 'in_transit', // Maps to "At Store" (Direct) or "On Way" (Proxy)
           shipped_at: new Date().toISOString() 
         })
         .eq('id', orderId);
   
       if (error) throw error;
   
-      toast.success('Order dispatched successfully!', { id: toastId });
+      toast.success('Status updated successfully!', { id: toastId });
       setOrders(prev => prev.filter(o => o.id !== orderId));
   
     } catch (error) {
@@ -160,8 +163,8 @@ const ShippingStatus = () => {
           <h1 className="text-2xl font-bold text-gray-900">Shipping Status</h1>
           <p className="text-gray-500">
             {profile?.role === 'retailer' 
-              ? 'Manage shipments for your physical stock' 
-              : 'Manage direct orders & inbound proxy fulfillments'}
+              ? 'Manage store readiness' 
+              : 'Manage shipments & fulfillments'}
           </p>
         </div>
         <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100">
@@ -173,30 +176,59 @@ const ShippingStatus = () => {
         <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
           <Truck size={48} className="mx-auto mb-4 text-green-500" />
           <h3 className="text-xl font-bold text-gray-800">All Caught Up!</h3>
-          <p className="text-gray-500">No orders pending shipment.</p>
+          <p className="text-gray-500">No orders pending action.</p>
         </div>
       ) : (
         <div className="grid gap-6">
-          {orders.map((order) => (
+          {orders.map((order) => {
+            const isOffline = order.fulfillment_type === 'offline_pickup';
+            let actionLabel = "Dispatch Order";
+            let actionIcon = <Box size={16} />;
+            let destinationAddress = order.shipping_address;
+            let destinationLabel = "Shipping Address";
+
+            // Logic for Offline Orders (Case 1, 2, 3)
+            if (isOffline) {
+                if (profile.role === 'wholesaler' && order.is_proxy_shipment) {
+                    // Case 3: Wholesaler shipping to Retailer
+                    actionLabel = "Dispatch to Retailer";
+                    actionIcon = <Truck size={16} />;
+                    
+                    // Show Retailer's Address (fetched from profiles relation)
+                    const retailer = order.order_items[0]?.seller;
+                    destinationAddress = retailer?.location_address || retailer?.address || "Address not available";
+                    destinationLabel = `Ship to Retailer (${retailer?.full_name || 'Store'})`;
+                } else {
+                    // Case 1 & 2: Direct Sale (Item is at the shop)
+                    actionLabel = "Mark Ready at Store";
+                    actionIcon = <Store size={16} />;
+                    destinationAddress = "Customer will pick up at store";
+                    destinationLabel = "Pickup";
+                }
+            }
+
+            return (
             <div key={order.id} className="bg-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all border border-red-100">
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="text-sm text-gray-500 font-mono">#{order.id.slice(0, 8)}</span>
+                    
+                    {/* Status Badge */}
                     <span className={`flex items-center text-xs px-2 py-1 rounded font-bold ${
                         order.status === 'processing' ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-50 text-orange-600'
                     }`}>
                       <Clock size={12} className="mr-1" /> {order.status.toUpperCase()}
                     </span>
                     
-                    {profile.role === 'wholesaler' && order.is_proxy_shipment && (
+                    {/* Type Badge */}
+                    {profile.role === 'wholesaler' && order.is_proxy_shipment ? (
                         <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-bold flex items-center">
                             <AlertCircle size={10} className="mr-1"/> PROXY (PAID)
                         </span>
-                    )}
-                    {profile.role === 'wholesaler' && !order.is_proxy_shipment && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold">
-                            DIRECT SALE
+                    ) : isOffline && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold flex items-center">
+                            <Store size={10} className="mr-1"/> OFFLINE PICKUP
                         </span>
                     )}
                   </div>
@@ -212,9 +244,15 @@ const ShippingStatus = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <MapPin className="text-gray-400 mt-0.5" size={16} />
-                    <p className="text-sm text-gray-600 font-medium">{order.shipping_address}</p>
+                  {/* Dynamic Address Display */}
+                  <div className="flex items-start gap-3 bg-gray-50 p-2 rounded-lg">
+                    <MapPin className="text-red-500 mt-0.5 shrink-0" size={16} />
+                    <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-0.5">{destinationLabel}</p>
+                        <p className="text-sm text-gray-800 font-medium leading-tight">
+                            {destinationAddress}
+                        </p>
+                    </div>
                   </div>
                 </div>
                 
@@ -223,12 +261,12 @@ const ShippingStatus = () => {
                     onClick={() => handleShipOrder(order.id)}
                     className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center gap-2 text-sm"
                   >
-                    <Box size={16} /> Dispatch Order <ArrowUpRight size={14} />
+                    {actionIcon} {actionLabel} <ArrowUpRight size={14} />
                   </button>
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>
