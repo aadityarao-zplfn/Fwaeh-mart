@@ -129,7 +129,7 @@ export const AuthProvider = ({ children }) => {
   
       const fetchPromise = supabase
         .from('profiles')
-        .select('id, role, full_name')
+        .select('id, role, full_name, phone, address')
         .eq('id', userId)
         .single(); // Changed to single() for faster response
   
