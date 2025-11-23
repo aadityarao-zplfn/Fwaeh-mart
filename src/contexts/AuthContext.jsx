@@ -148,7 +148,7 @@ export const AuthProvider = ({ children }) => {
         setProfile(data);
       } else {
         console.log('⚠️ No profile found, creating...');
-        await createProfile(userId);
+      await createProfile(userId, user);
       }
     } catch (error) {
       console.error('💥 Profile fetch failed:', error);
@@ -170,7 +170,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   // SIMPLIFIED: Create profile
-  const createProfile = async (userId) => {
+   // SIMPLIFIED: Create profile
+  const createProfile = async (userId, userData = {}) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -179,6 +180,8 @@ export const AuthProvider = ({ children }) => {
             id: userId, 
             role: 'retailer',
             full_name: user?.email?.split('@')[0] || 'User',
+            phone: userData.phone || null,
+            address: userData.address || null,
           }
         ])
         .select()
@@ -194,7 +197,9 @@ export const AuthProvider = ({ children }) => {
       setProfile({
         id: userId,
         role: 'retailer',
-        full_name: user?.email?.split('@')[0] || 'User'
+        full_name: user?.email?.split('@')[0] || 'User',
+        phone: userData.phone || null,
+        address: userData.address || null,
       });
     }
   };
