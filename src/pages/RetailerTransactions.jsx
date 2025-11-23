@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, User, Package, Calendar, Search, ArrowRight } from 'lucide-react';
+import { CreditCard, User, Package, Calendar, Search } from 'lucide-react';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -21,72 +21,50 @@ const RetailerTransactions = () => {
     try {
       setLoading(true);
 
-      // 1. Fetch items sold by this wholesaler (Fulfillment Orders)
-      // Filter for 'retailer_credit' payment method (B2B transactions)
-      const { data: fulfillmentItems, error } = await supabase
+      // 1. UPDATED QUERY: Fetch 'wholesaler_price'
+      const { data: items, error } = await supabase
         .from('order_items')
         .select(`
           id,
           quantity,
           price_at_purchase,
+          wholesaler_price, 
           created_at,
-          order_id,
-          products!order_items_product_id_fkey (name, image_url),
+          seller_id,
+          products!order_items_product_id_fkey!inner (
+            name, 
+            image_url,
+            wholesaler_id
+          ),
           orders!inner (
             id,
             total_amount,
             status,
-            payment_method
+            wholesaler_payment_made
           )
         `)
-        .eq('seller_id', user.id)
-        .eq('orders.payment_method', 'retailer_credit')
+        .eq('products.wholesaler_id', user.id)
+        .eq('orders.wholesaler_payment_made', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      if (!fulfillmentItems || fulfillmentItems.length === 0) {
+      if (!items || items.length === 0) {
         setTransactions([]);
         setLoading(false);
         return;
       }
 
-      // 2. TRACE BACK: Find the Original Orders that link to these Fulfillment Orders
-      // We need this because the Retailer ID is on the Original Order, not the Fulfillment Order
-      const fulfillmentOrderIds = [...new Set(fulfillmentItems.map(item => item.order_id))];
-      
-      const { data: originalOrders, error: traceError } = await supabase
-        .from('orders')
-        .select(`
-          wholesaler_fulfillment_order_id,
-          order_items (
-            seller_id
-          )
-        `)
-        .in('wholesaler_fulfillment_order_id', fulfillmentOrderIds);
+      // 2. Extract Retailer IDs
+      const retailerIds = [...new Set(items.map(item => item.seller_id))];
 
-      if (traceError) throw traceError;
-
-      // 3. Map Fulfillment ID -> Retailer ID
-      const fulfillmentToRetailerMap = {};
-      const retailerIds = new Set();
-
-      originalOrders.forEach(order => {
-        // The seller of the ORIGINAL order is the Retailer
-        const retailerId = order.order_items?.[0]?.seller_id;
-        if (retailerId) {
-          fulfillmentToRetailerMap[order.wholesaler_fulfillment_order_id] = retailerId;
-          retailerIds.add(retailerId);
-        }
-      });
-
-      // 4. Fetch Retailer Profiles
+      // 3. Fetch Retailer Profiles
       let retailersProfileMap = {};
-      if (retailerIds.size > 0) {
+      if (retailerIds.length > 0) {
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name')
-          .in('id', Array.from(retailerIds));
+          .in('id', retailerIds);
           
         if (profilesError) throw profilesError;
         
@@ -96,10 +74,14 @@ const RetailerTransactions = () => {
         }, {});
       }
 
-      // 5. Format Data
-      const formattedTransactions = fulfillmentItems.map(item => {
-        const retailerId = fulfillmentToRetailerMap[item.order_id];
-        const retailerName = retailersProfileMap[retailerId] || 'Unknown Retailer';
+      // 4. UPDATED MAPPING: Use 'wholesaler_price' for calculation
+      const formattedTransactions = items.map(item => {
+        const retailerName = retailersProfileMap[item.seller_id] || 'Unknown Retailer';
+        
+        // LOGIC FIX:
+        // If wholesaler_price exists (Proxy Order), use it.
+        // Fallback to price_at_purchase only if it's a direct sale (though this query filters for proxy).
+        const unitPrice = item.wholesaler_price || item.price_at_purchase;
 
         return {
           id: item.id,
@@ -108,7 +90,8 @@ const RetailerTransactions = () => {
           productName: item.products?.name || 'Unknown Product',
           productImage: item.products?.image_url,
           quantity: item.quantity,
-          totalPrice: (item.price_at_purchase * item.quantity).toFixed(2),
+          // Use the corrected unit price
+          totalPrice: (unitPrice * item.quantity).toFixed(2), 
           date: item.created_at
         };
       });
