@@ -89,8 +89,9 @@ const ShippingStatus = () => {
         .from('orders')
         .select('*')
         .in('id', orderIds)
-        .neq('status', 'delivered') 
-        .neq('status', 'cancelled')
+        //.neq('status', 'delivered') 
+        //.neq('status', 'cancelled')
+        .in('status', ['pending', 'processing'])
         .order('created_at', { ascending: true });
 
       if (ordersError) throw ordersError;
