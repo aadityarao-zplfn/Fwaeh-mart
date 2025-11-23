@@ -135,8 +135,8 @@ const Profile = () => {
               </label>
               <p className="px-4 py-3 rounded-xl" style={{ background: '#fafafa', color: '#a73636' }}>
                 {userData.address}
-              </p>*/}
-            </div>
+              </p>
+            </div>*/}
           </div>
         </div>
       </div>
