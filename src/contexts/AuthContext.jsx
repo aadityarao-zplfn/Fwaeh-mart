@@ -129,7 +129,7 @@ export const AuthProvider = ({ children }) => {
   
       const fetchPromise = supabase
         .from('profiles')
-        .select('id, role, full_name, phone, address')
+        .select('id, role, full_name')
         .eq('id', userId)
         .single(); // Changed to single() for faster response
   
@@ -148,7 +148,7 @@ export const AuthProvider = ({ children }) => {
         setProfile(data);
       } else {
         console.log('⚠️ No profile found, creating...');
-      await createProfile(userId, user);
+        await createProfile(userId);
       }
     } catch (error) {
       console.error('💥 Profile fetch failed:', error);
@@ -170,8 +170,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // SIMPLIFIED: Create profile
-   // SIMPLIFIED: Create profile
-  const createProfile = async (userId, userData = {}) => {
+  const createProfile = async (userId) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -180,8 +179,6 @@ export const AuthProvider = ({ children }) => {
             id: userId, 
             role: 'retailer',
             full_name: user?.email?.split('@')[0] || 'User',
-            phone: userData.phone || null,
-            address: userData.address || null,
           }
         ])
         .select()
@@ -197,9 +194,7 @@ export const AuthProvider = ({ children }) => {
       setProfile({
         id: userId,
         role: 'retailer',
-        full_name: user?.email?.split('@')[0] || 'User',
-        phone: userData.phone || null,
-        address: userData.address || null,
+        full_name: user?.email?.split('@')[0] || 'User'
       });
     }
   };
