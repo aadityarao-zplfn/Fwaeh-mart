@@ -116,7 +116,7 @@ const Profile = () => {
               </p>
             </div>
 
-            /*{/* Phone */}
+            {/*Phone
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold mb-2" style={{ color: '#a73636' }}>
                 <Phone size={16} />
@@ -127,7 +127,7 @@ const Profile = () => {
               </p>
             </div>
 
-            {/* Address */}
+            Address
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold mb-2" style={{ color: '#a73636' }}>
                 <MapPin size={16} />
@@ -135,7 +135,7 @@ const Profile = () => {
               </label>
               <p className="px-4 py-3 rounded-xl" style={{ background: '#fafafa', color: '#a73636' }}>
                 {userData.address}
-              </p>*/
+              </p>*/}
             </div>
           </div>
         </div>
