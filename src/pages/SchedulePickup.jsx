@@ -74,98 +74,100 @@ const SchedulePickup = () => {
   };
 
   const handleConfirmSchedule = async () => {
-  if (!selectedDate) {
-    toast.error('Please select a pickup date and time');
-    return;
-  }
-
-  // Validate the selected date and time
-  const validationError = validateDateTime(selectedDate);
-  if (validationError) {
-    toast.error(validationError);
-    return;
-  }
-
-  setProcessing(true);
-  const toastId = toast.loading('Scheduling pickup & reserving stock...');
-
-  try {
-    // 1. Prepare Inventory Payload
-    const inventoryPayload = cartItems.map(item => ({
-      product_id: item.product_id,
-      quantity: item.quantity
-    }));
-
-    // 2. Atomic Stock Deduction (RPC)
-    const { data: stockResult, error: rpcError } = await supabase.rpc('process_order_inventory', {
-      cart_items: inventoryPayload
-    });
-
-    if (rpcError) {
-      throw new Error(`Database error: ${rpcError.message}`);
-    }
-    
-    if (!stockResult || !stockResult.success) {
-      throw new Error(stockResult?.error || 'Failed to reserve stock. Items may be out of stock.');
+    if (!selectedDate) {
+      toast.error('Please select a pickup date and time');
+      return;
     }
 
-    // 3. Create Offline Order - USE EXISTING STATUS
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert([{
-        user_id: user.id,
-        total_amount: calculateTotal(),
-        status: 'pending', // ← CHANGED: Use existing status
-        fulfillment_type: 'offline_pickup',
-        scheduled_at: new Date(selectedDate).toISOString(),
-        shipping_address: 'Offline Pickup at Store',
-        contact_phone: profile?.phone || '',
-        contact_email: user.email,
-        pickup_status: 'pending'
-      }])
-      .select()
-      .single();
+    // Validate the selected date and time
+    const validationError = validateDateTime(selectedDate);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
 
-    if (orderError) throw orderError;
+    setProcessing(true);
+    const toastId = toast.loading('Scheduling pickup & reserving stock...');
 
-    // 4. Create Order Items
-    const orderItemsData = cartItems.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      seller_id: item.products.seller_id,
-      quantity: item.quantity,
-      price_at_purchase: item.products.price
-    }));
-
-    const { error: orderItemsError } = await supabase.from('order_items').insert(orderItemsData);
-    if (orderItemsError) throw orderItemsError;
-
-    // 5. Clear Cart
-    await supabase.from('cart_items').delete().eq('user_id', user.id);
-
-    // 6. Navigate to Success Page
-    toast.success('Pickup scheduled successfully!', { id: toastId });
-    navigate('/pickup-success', { state: { order, pickupTime: selectedDate } });
-
-  } catch (error) {
-    console.error('Scheduling failed:', error);
-    
-    // Attempt to restore stock if we have the restore function
     try {
-      if (typeof supabase.rpc('restore_order_inventory') === 'function') {
-        await supabase.rpc('restore_order_inventory', {
-          cart_items: inventoryPayload
-        });
+      // 1. Prepare Inventory Payload
+      const inventoryPayload = cartItems.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity
+      }));
+
+      // 2. Atomic Stock Deduction (RPC)
+      const { data: stockResult, error: rpcError } = await supabase.rpc('process_order_inventory', {
+        cart_items: inventoryPayload
+      });
+
+      if (rpcError) {
+        throw new Error(`Database error: ${rpcError.message}`);
       }
-    } catch (restoreError) {
-      console.error('Failed to restore stock:', restoreError);
+      
+      if (!stockResult || !stockResult.success) {
+        throw new Error(stockResult?.error || 'Failed to reserve stock. Items may be out of stock.');
+      }
+
+      // 3. Create Offline Order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          user_id: user.id,
+          total_amount: calculateTotal(),
+          status: 'pending', 
+          fulfillment_type: 'offline_pickup',
+          scheduled_at: new Date(selectedDate).toISOString(),
+          shipping_address: 'Offline Pickup at Store',
+          contact_phone: profile?.phone || '',
+          contact_email: user.email,
+          pickup_status: 'pending'
+        }])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 4. Create Order Items (FIXED: Added wholesaler_price)
+      const orderItemsData = cartItems.map(item => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        seller_id: item.products.seller_id,
+        quantity: item.quantity,
+        price_at_purchase: item.products.price,
+        // ✅ CRITICAL FIX: Save the wholesaler price for proxy logic
+        wholesaler_price: item.products.wholesaler_price || null 
+      }));
+
+      const { error: orderItemsError } = await supabase.from('order_items').insert(orderItemsData);
+      if (orderItemsError) throw orderItemsError;
+
+      // 5. Clear Cart
+      await supabase.from('cart_items').delete().eq('user_id', user.id);
+
+      // 6. Navigate to Success Page
+      toast.success('Pickup scheduled successfully!', { id: toastId });
+      navigate('/pickup-success', { state: { order, pickupTime: selectedDate } });
+
+    } catch (error) {
+      console.error('Scheduling failed:', error);
+      
+      // Attempt to restore stock if we have the restore function
+      try {
+        if (typeof supabase.rpc('restore_order_inventory') === 'function') {
+          await supabase.rpc('restore_order_inventory', {
+            cart_items: inventoryPayload
+          });
+        }
+      } catch (restoreError) {
+        console.error('Failed to restore stock:', restoreError);
+      }
+      
+      toast.error(`Failed: ${error.message}`, { id: toastId });
+    } finally {
+      setProcessing(false);
     }
-    
-    toast.error(`Failed: ${error.message}`, { id: toastId });
-  } finally {
-    setProcessing(false);
-  }
-};
+  };
 
   // Get min date (2 hours from now)
   const getMinDate = () => {
