@@ -70,7 +70,7 @@ export default function OTPModal({ onVerify, email, userId, onClose }) {
         return;
       }
 
-      toast.success(`New OTP sent! Check console for code.`);
+      toast.success(`New OTP sent to your email!`);
       setTimeLeft(60);
       setCanResend(false);
       setOtp(["", "", "", "", "", ""]);
@@ -116,15 +116,7 @@ export default function OTPModal({ onVerify, email, userId, onClose }) {
               {email}
             </p>
             
-            {/* 🆕 DEVELOPMENT HELPER */}
-            <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200">
-              <p className="text-xs text-green-800 font-medium">
-                ✅ <strong>Instant OTP Delivery:</strong> Check browser console for code
-              </p>
-              <p className="text-xs text-green-800 mt-1">
-                User ID: {userId?.slice(0, 8)}...
-              </p>
-            </div>
+            {/* 🗑️ REMOVED: The Green "Development Helper" Box was here */}
           </div>
 
           <div className="mb-8">
